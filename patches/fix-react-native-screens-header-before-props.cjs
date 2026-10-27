@@ -69,7 +69,7 @@ const edits = [
         replace: `  [super viewDidAppear:animated];
   // ${MARKER}: the screen on top owns the bar; re-apply its final config.
   if (self.navigationController != nil && self.navigationController.topViewController == self) {
-    [RNSScreenStackHeaderConfig updateViewController:self withConfig:[self.screenView findHeaderConfig] animated:NO];
+    [RNSScreenStackHeaderConfig willShowViewController:self animated:NO withConfig:[self.screenView findHeaderConfig]];
   }
   if (!_isSwiping || _shouldNotify) {`,
     },
