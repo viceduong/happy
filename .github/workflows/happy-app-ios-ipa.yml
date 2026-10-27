@@ -29,6 +29,12 @@ jobs:
         with:
           persist-credentials: false
 
+      # Expo SDK 55 needs the Xcode 26 SDK; the runner defaults to 16.x.
+      # The deployment target stays 15.1, so the app still runs on iOS 15.
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
       - name: Xcode version
         run: xcode-select -p && xcodebuild -version
 
@@ -69,14 +75,16 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            build | tee "$RUNNER_TEMP/xcodebuild.log" | grep -E '^(error|warning: .*deployment|\*\*)' || true
-          test "${PIPESTATUS[0]}" -eq 0
+            build > "$RUNNER_TEMP/xcodebuild.log" 2>&1 && STATUS=0 || STATUS=$?
+          grep -E 'error:|\*\* BUILD' "$RUNNER_TEMP/xcodebuild.log" | head -60 || true
+          exit "$STATUS"
 
       - name: Package .ipa
         run: |
           set -euo pipefail
           APP_PATH=$(find "$RUNNER_TEMP/dd/Build/Products/Release-iphoneos" -maxdepth 1 -name '*.app' -type d | head -1)
           echo "app=$APP_PATH"
+          test -f "$APP_PATH/Info.plist" || { echo "::error::No built app"; exit 1; }
           echo "MinimumOSVersion: $(/usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$APP_PATH/Info.plist")"
           echo "Bundle id: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Info.plist")"
           test -f "$APP_PATH/main.jsbundle" && echo "JS bundle embedded"
