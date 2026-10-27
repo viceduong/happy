@@ -93,8 +93,8 @@ for (const nodeModulesRoot of nodeModulesRoots) {
         const original = content;
         for (const edit of fileEdits) {
             if (content.includes(edit.replace)) continue;
-            // The temporary diagnostics patch replaces the viewDidAppear re-apply.
-            if (content.includes('happy-diag: viewDidAppear')) continue;
+            // Already patched, then rewritten by the temporary diagnostics patch.
+            if (content.includes('happy-diag')) continue;
             if (!content.includes(edit.find)) {
                 throw new Error(`[patch] react-native-screens header patch: anchor not found in ${file}`);
             }

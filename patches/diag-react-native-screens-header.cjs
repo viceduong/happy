@@ -3,10 +3,15 @@
  * HAPPY_HEADER_DIAG=1 (the sideload IPA workflow), after
  * fix-react-native-screens-header-before-props.cjs.
  *
- * Whenever react-native-screens un-hides the navigation bar, the bar's title
- * is replaced with what did it: the config's own title (which screen), its
- * show/props state, whether that controller is on top, and the caller. The
- * viewDidAppear re-apply is removed so the bar stays up for a screenshot.
+ * Keeps a log of the last 4 navigation-bar events and shows it, in a small
+ * multi-line label, as the title of the navigation item it touches:
+ *   S  config un-hides the bar        H  config hides the bar
+ *   X  config skipped (no props yet)  A  screen did appear
+ * Each event: screen (first 4 chars of the config title), caller
+ * (wS = willShowViewController, iN = updateViewControllerIfNeeded),
+ * a = animated, t = push/pop transition in progress, w = bar hidden before,
+ * h = bar hidden after. The viewDidAppear re-apply is disabled so the bar
+ * stays up for a screenshot.
  */
 if (process.env.HAPPY_HEADER_DIAG !== '1') return;
 
@@ -24,54 +29,143 @@ const edits = [
     {
         file: 'react-native-screens/ios/RNSScreenStackHeaderConfig.mm',
         find: `@implementation RNSScreenStackHeaderConfig {`,
-        replace: `// ${MARKER}: last caller of updateViewController.
+        replace: `// ${MARKER}: navigation bar event log.
 static NSString *gHappyDiagCaller = nil;
+static NSMutableArray<NSString *> *gHappyDiagEvents = nil;
+
+NSString *HappyDiagShortTitle(NSString *title)
+{
+  if (title == nil) {
+    return @"nil";
+  }
+  return title.length > 4 ? [title substringToIndex:4] : title;
+}
+
+NSString *HappyDiagLogEvent(NSString *event)
+{
+  if (gHappyDiagEvents == nil) {
+    gHappyDiagEvents = [NSMutableArray new];
+  }
+  [gHappyDiagEvents addObject:event];
+  while (gHappyDiagEvents.count > 4) {
+    [gHappyDiagEvents removeObjectAtIndex:0];
+  }
+  return [gHappyDiagEvents componentsJoinedByString:@"\\n"];
+}
+
+void HappyDiagShowLog(UINavigationItem *item, NSString *log)
+{
+  UILabel *label = [UILabel new];
+  label.text = log;
+  label.numberOfLines = 4;
+  label.font = [UIFont monospacedSystemFontOfSize:8 weight:UIFontWeightRegular];
+  label.textColor = UIColor.systemRedColor;
+  label.textAlignment = NSTextAlignmentLeft;
+  [label sizeToFit];
+  item.title = log;
+  item.titleView = label;
+}
 
 @implementation RNSScreenStackHeaderConfig {`,
     },
     {
         file: 'react-native-screens/ios/RNSScreenStackHeaderConfig.mm',
         find: `    [RNSScreenStackHeaderConfig updateViewController:self.screenView.controller withConfig:self animated:YES];`,
-        replace: `    gHappyDiagCaller = @"ifNeeded"; // ${MARKER}
+        replace: `    gHappyDiagCaller = @"iN"; // ${MARKER}
     [RNSScreenStackHeaderConfig updateViewController:self.screenView.controller withConfig:self animated:YES];`,
     },
     {
         file: 'react-native-screens/ios/RNSScreenStackHeaderConfig.mm',
         find: `  [self updateViewController:vc withConfig:config animated:animated];
   // As the header might have change in \`updateViewController\``,
-        replace: `  gHappyDiagCaller = @"willShow"; // ${MARKER}
+        replace: `  gHappyDiagCaller = @"wS"; // ${MARKER}
   [self updateViewController:vc withConfig:config animated:animated];
   // As the header might have change in \`updateViewController\``,
+    },
+    {
+        // The fix patch's early return for configs without props.
+        file: 'react-native-screens/ios/RNSScreenStackHeaderConfig.mm',
+        find: `  if (config != nil && !config->_initialPropsSet) {
+    return;
+  }`,
+        replace: `  if (config != nil && !config->_initialPropsSet) {
+    HappyDiagLogEvent([NSString stringWithFormat:@"X %@ %@", HappyDiagShortTitle(config.title), gHappyDiagCaller ?: @"?"]); // ${MARKER}
+    return;
+  }`,
+    },
+    {
+        file: 'react-native-screens/ios/RNSScreenStackHeaderConfig.mm',
+        find: `  if (shouldHide) {
+    navitem.title = config.title;
+
+    // Setting navigation bar visibility is split to mitigate iOS 26 bug with bar button items.
+    [navctr setNavigationBarHidden:YES animated:animated];
+    return;
+  }`,
+        replace: `  if (shouldHide) {
+    navitem.title = config.title;
+
+    // Setting navigation bar visibility is split to mitigate iOS 26 bug with bar button items.
+    [navctr setNavigationBarHidden:YES animated:animated];
+    // ${MARKER}
+    HappyDiagShowLog(
+        navitem,
+        HappyDiagLogEvent([NSString stringWithFormat:@"H %@ %@ a%d t%d w%d>h%d n%lu",
+                                                     HappyDiagShortTitle(config.title),
+                                                     gHappyDiagCaller ?: @"?",
+                                                     (int)animated,
+                                                     (int)(navctr.transitionCoordinator != nil),
+                                                     (int)wasHidden,
+                                                     (int)navctr.navigationBarHidden,
+                                                     (unsigned long)navctr.viewControllers.count]));
+    return;
+  }`,
     },
     {
         file: 'react-native-screens/ios/RNSScreenStackHeaderConfig.mm',
         find: `  RCTAssert(shouldHide == NO, @"[RNScreens] RNSScreenStackHeaderConfig: expected shouldHide to be NO.");
   [navctr setNavigationBarHidden:NO animated:animated];`,
         replace: `  RCTAssert(shouldHide == NO, @"[RNScreens] RNSScreenStackHeaderConfig: expected shouldHide to be NO.");
-  // ${MARKER}: name whoever un-hides the bar, in the bar itself.
-  navitem.title = [NSString stringWithFormat:@"SHOW %@ by %@ show=%d props=%d top=%d n=%lu",
-                                             config.title ?: @"nil",
-                                             gHappyDiagCaller ?: @"?",
-                                             (int)config.shouldHeaderBeVisible,
-#ifdef RCT_NEW_ARCH_ENABLED
-                                             (int)config->_initialPropsSet,
-#else
-                                             -1,
-#endif
-                                             (int)(vc == navctr.topViewController),
-                                             (unsigned long)navctr.viewControllers.count];
-  navitem.titleView = nil;
-  [navctr setNavigationBarHidden:NO animated:animated];`,
+  [navctr setNavigationBarHidden:NO animated:animated];
+  // ${MARKER}
+  HappyDiagShowLog(
+      navitem,
+      HappyDiagLogEvent([NSString stringWithFormat:@"S %@ %@ a%d t%d w%d>h%d top%d",
+                                                   HappyDiagShortTitle(config.title),
+                                                   gHappyDiagCaller ?: @"?",
+                                                   (int)animated,
+                                                   (int)(navctr.transitionCoordinator != nil),
+                                                   (int)wasHidden,
+                                                   (int)navctr.navigationBarHidden,
+                                                   (int)(vc == navctr.topViewController)]));`,
     },
     {
-        // Drop the safety net so the bar stays up long enough to read.
+        // Replace the fix patch's viewDidAppear re-apply with an appear event.
         file: 'react-native-screens/ios/RNSScreen.mm',
         find: `  if (self.navigationController != nil && self.navigationController.topViewController == self) {
     [RNSScreenStackHeaderConfig willShowViewController:self animated:NO withConfig:[self.screenView findHeaderConfig]];
   }
 `,
         replace: `  // ${MARKER}: viewDidAppear header re-apply disabled for diagnostics.
+  if (self.navigationController != nil) {
+    HappyDiagShowLog(
+        self.navigationItem,
+        HappyDiagLogEvent([NSString stringWithFormat:@"A %@ top%d h%d",
+                                                     HappyDiagShortTitle([self.screenView findHeaderConfig].title),
+                                                     (int)(self.navigationController.topViewController == self),
+                                                     (int)self.navigationController.navigationBarHidden]));
+  }
 `,
+    },
+    {
+        file: 'react-native-screens/ios/RNSScreen.mm',
+        find: `#import "RNSScreenStackHeaderConfig.h"`,
+        replace: `#import "RNSScreenStackHeaderConfig.h"
+
+// ${MARKER}: defined in RNSScreenStackHeaderConfig.mm.
+NSString *HappyDiagShortTitle(NSString *title);
+NSString *HappyDiagLogEvent(NSString *event);
+void HappyDiagShowLog(UINavigationItem *item, NSString *log);`,
     },
 ];
 
