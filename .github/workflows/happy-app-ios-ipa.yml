@@ -1,0 +1,102 @@
+name: happy-app-ios-ipa
+
+# Unsigned Release IPA of packages/happy-app for sideloading (TrollStore,
+# Sideloadly, AltStore) on older iPhones, e.g. iOS 15.x. Built with the
+# `sideload` variant: its own bundle id, OTA updates disabled.
+
+on:
+  push:
+    branches: [ios15-build]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: happy-app-ios-ipa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ipa:
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      APP_ENV: sideload
+      SHARP_IGNORE_GLOBAL_LIBVIPS: '1'
+      EXPO_NO_TELEMETRY: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Xcode version
+        run: xcode-select -p && xcodebuild -version
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Expo prebuild (iOS)
+        working-directory: packages/happy-app
+        run: npx expo prebuild --platform ios --clean --no-install
+
+      - name: Pod install
+        working-directory: packages/happy-app/ios
+        run: pod install
+
+      - name: Build unsigned Release app
+        working-directory: packages/happy-app/ios
+        run: |
+          set -euo pipefail
+          WORKSPACE=$(ls -d *.xcworkspace | head -1)
+          SCHEME="${WORKSPACE%.xcworkspace}"
+          echo "workspace=$WORKSPACE scheme=$SCHEME"
+          xcodebuild \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/dd" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            build | tee "$RUNNER_TEMP/xcodebuild.log" | grep -E '^(error|warning: .*deployment|\*\*)' || true
+          test "${PIPESTATUS[0]}" -eq 0
+
+      - name: Package .ipa
+        run: |
+          set -euo pipefail
+          APP_PATH=$(find "$RUNNER_TEMP/dd/Build/Products/Release-iphoneos" -maxdepth 1 -name '*.app' -type d | head -1)
+          echo "app=$APP_PATH"
+          echo "MinimumOSVersion: $(/usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$APP_PATH/Info.plist")"
+          echo "Bundle id: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Info.plist")"
+          test -f "$APP_PATH/main.jsbundle" && echo "JS bundle embedded"
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
+          SHORT_SHA="${GITHUB_SHA::7}"
+          zip -qr "Happy-sideload-$SHORT_SHA.ipa" Payload
+          ls -la Happy-sideload-*.ipa
+
+      - name: Upload .ipa
+        uses: actions/upload-artifact@v4
+        with:
+          name: Happy-sideload-ipa
+          path: Happy-sideload-*.ipa
+          retention-days: 14
+
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: ${{ runner.temp }}/xcodebuild.log
+          retention-days: 7

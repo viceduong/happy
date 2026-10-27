@@ -4,12 +4,15 @@ const variant = process.env.APP_ENV || 'development';
 const name = {
     development: "Happy (dev)",
     preview: "Happy (preview)",
-    production: "Happy"
+    production: "Happy",
+    sideload: "Happy (dev)",
 }[variant];
 const bundleId = {
     development: "com.slopus.happy.dev",
     preview: "com.slopus.happy.preview",
-    production: "com.ex3ndr.happy"
+    production: "com.ex3ndr.happy",
+    // Unsigned IPA for TrollStore/sideloading next to the App Store build.
+    sideload: "com.viceduong.happy.dev",
 }[variant];
 // const stagingElevenLabsAgentId = 'agent_7801k2c0r5hjfraa1kdbytpvs6yt';
 const productionElevenLabsAgentId = 'agent_6701k211syvvegba4kt7m68nxjmw';
@@ -17,11 +20,13 @@ const elevenLabsAgentId = {
     development: productionElevenLabsAgentId,
     preview: productionElevenLabsAgentId,
     production: productionElevenLabsAgentId,
+    sideload: productionElevenLabsAgentId,
 }[variant];
 const consoleLoggingDefault = {
     development: true,
     preview: true,
     production: false,
+    sideload: true,
 }[variant];
 
 function git(args) {
@@ -207,7 +212,9 @@ export default {
                 }
             ]
         ],
-        updates: {
+        // A sideloaded build must never pull upstream's OTA bundle over its
+        // own JS: it shares runtimeVersion with the store app.
+        updates: variant === 'sideload' ? { enabled: false } : {
             url: "https://u.expo.dev/4558dd3d-cd5a-47cd-bad9-e591a241cc06",
             requestHeaders: {
                 "expo-channel-name": "production"
