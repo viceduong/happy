@@ -1,19 +1,20 @@
 /**
- * react-native-screens 4.22 (Fabric) can show the native navigation bar on a
- * screen whose header is hidden (`headerShown: false`), e.g. the session
- * screen on iOS 15, where UIKit's bar with the route name ("session/[id]")
- * ends up under the app's own glass header (slopus/happy#1890).
+ * Keeps the native navigation bar hidden for screens with `headerShown: false`
+ * on iOS 15 (slopus/happy#1890): the session screen otherwise shows UIKit's bar
+ * with the route name ("session/[id]") and "Back" under the app's glass header.
  *
- * RNSScreenStackHeaderConfig starts with `_show = YES` until Fabric delivers
- * its props. When UIKit's push callback (`willShowViewController`) applies the
- * config before that, the placeholder `show` un-hides the bar.
+ * react-native-screens 4.22 hides the bar from UIKit's
+ * `navigationController:willShowViewController:animated:` with
+ * `setNavigationBarHidden:YES animated:YES`. On iOS 15 UINavigationController
+ * accepts that, then restores the bar state it captured when the push/pop
+ * started once the transition completes. Every back navigation therefore
+ * leaves the (transparent, empty) bar visible on home, and the next push
+ * shows it with the pushed screen's navigation item.
  *
- * 1. Never apply a header config that has not received its first props; the
- *    bar keeps its current state until the real props arrive.
- * 2. Mark the props as set before `updateProps` applies them, so that first
- *    real update is not skipped by (1).
- * 3. Re-apply the top screen's header config when it appears, so no stale
- *    bar state can outlive a transition.
+ * 1. When the bar is hidden during a transition, hide it again (without
+ *    animation) when that transition completes, if the screen is still on top
+ *    and still wants no header.
+ * 2. Re-apply the top screen's header config when it appears, as a safety net.
  */
 const fs = require('fs');
 const path = require('path');
@@ -28,39 +29,36 @@ const MARKER = 'happy: header-before-props';
 const edits = [
     {
         file: 'react-native-screens/ios/RNSScreenStackHeaderConfig.mm',
-        find: `  if (navctr == nil) {
-    return;
-  }
+        find: `  if (shouldHide) {
+    navitem.title = config.title;
+`,
+        replace: `  if (shouldHide) {
+    // ${MARKER}: iOS 15 restores the bar state captured at the start of a
+    // push/pop when the transition completes, undoing the hide below.
+    id<UIViewControllerTransitionCoordinator> coordinator = navctr.transitionCoordinator;
+    if (coordinator != nil) {
+      __weak UINavigationController *weakNav = navctr;
+      __weak UIViewController *weakVC = vc;
+      __weak RNSScreenStackHeaderConfig *weakConfig = config;
+      [coordinator animateAlongsideTransition:nil
+                                   completion:^(id<UIViewControllerTransitionCoordinatorContext> context) {
+                                     UINavigationController *strongNav = weakNav;
+                                     if (context.isCancelled || strongNav == nil ||
+                                         strongNav.topViewController != weakVC) {
+                                       return;
+                                     }
+                                     RNSScreenStackHeaderConfig *strongConfig = weakConfig;
+                                     if (strongConfig != nil && strongConfig.shouldHeaderBeVisible) {
+                                       return;
+                                     }
+                                     if (!strongNav.navigationBarHidden) {
+                                       [strongNav setNavigationBarHidden:YES animated:NO];
+                                     }
+                                   }];
+    }
 
-  NSUInteger currentIndex = [navctr.viewControllers indexOfObject:vc];`,
-        replace: `  if (navctr == nil) {
-    return;
-  }
-
-#ifdef RCT_NEW_ARCH_ENABLED
-  // ${MARKER}: \`show\` is only a placeholder until the first props arrive;
-  // applying it here would un-hide the bar for a headerShown: false screen.
-  if (config != nil && !config->_initialPropsSet) {
-    return;
-  }
-#endif
-
-  NSUInteger currentIndex = [navctr.viewControllers indexOfObject:vc];`,
-    },
-    {
-        file: 'react-native-screens/ios/RNSScreenStackHeaderConfig.mm',
-        find: `  [self updateViewControllerIfNeeded];
-
-  if (needsNavigationControllerLayout) {
-    [self layoutNavigationControllerView];
-  }`,
-        replace: `  // ${MARKER}: the props are set from here on, so this update must apply.
-  _initialPropsSet = YES;
-  [self updateViewControllerIfNeeded];
-
-  if (needsNavigationControllerLayout) {
-    [self layoutNavigationControllerView];
-  }`,
+    navitem.title = config.title;
+`,
     },
     {
         file: 'react-native-screens/ios/RNSScreen.mm',
@@ -110,5 +108,5 @@ for (const nodeModulesRoot of nodeModulesRoots) {
 if (found === 0) {
     console.log('[patch] react-native-screens not installed, header patch skipped');
 } else if (patched > 0) {
-    console.log(`[patch] Fixed react-native-screens header shown before props (${patched} file(s))`);
+    console.log(`[patch] Fixed react-native-screens bar reappearing after transitions (${patched} file(s))`);
 }

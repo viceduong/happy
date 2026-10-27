@@ -6,7 +6,7 @@
  * Keeps a log of the last 4 navigation-bar events and shows it, in a small
  * multi-line label, as the title of the navigation item it touches:
  *   S  config un-hides the bar        H  config hides the bar
- *   X  config skipped (no props yet)  A  screen did appear
+ *   C  transition-completion re-hide   A  screen did appear
  * Each event: screen (first 4 chars of the config title), caller
  * (wS = willShowViewController, iN = updateViewControllerIfNeeded),
  * a = animated, t = push/pop transition in progress, w = bar hidden before,
@@ -83,27 +83,31 @@ void HappyDiagShowLog(UINavigationItem *item, NSString *log)
   // As the header might have change in \`updateViewController\``,
     },
     {
-        // The fix patch's early return for configs without props.
+        // The fix patch's transition-completion re-hide.
         file: 'react-native-screens/ios/RNSScreenStackHeaderConfig.mm',
-        find: `  if (config != nil && !config->_initialPropsSet) {
-    return;
-  }`,
-        replace: `  if (config != nil && !config->_initialPropsSet) {
-    HappyDiagLogEvent([NSString stringWithFormat:@"X %@ %@", HappyDiagShortTitle(config.title), gHappyDiagCaller ?: @"?"]); // ${MARKER}
-    return;
-  }`,
+        find: `                                     if (!strongNav.navigationBarHidden) {
+                                       [strongNav setNavigationBarHidden:YES animated:NO];
+                                     }`,
+        replace: `                                     BOOL happyDiagWasHidden = strongNav.navigationBarHidden; // ${MARKER}
+                                     if (!strongNav.navigationBarHidden) {
+                                       [strongNav setNavigationBarHidden:YES animated:NO];
+                                     }
+                                     HappyDiagShowLog(
+                                         weakVC.navigationItem,
+                                         HappyDiagLogEvent([NSString stringWithFormat:@"C %@ w%d>h%d",
+                                                                                      HappyDiagShortTitle(strongConfig.title),
+                                                                                      (int)happyDiagWasHidden,
+                                                                                      (int)strongNav.navigationBarHidden]));`,
     },
     {
         file: 'react-native-screens/ios/RNSScreenStackHeaderConfig.mm',
-        find: `  if (shouldHide) {
-    navitem.title = config.title;
+        find: `    navitem.title = config.title;
 
     // Setting navigation bar visibility is split to mitigate iOS 26 bug with bar button items.
     [navctr setNavigationBarHidden:YES animated:animated];
     return;
   }`,
-        replace: `  if (shouldHide) {
-    navitem.title = config.title;
+        replace: `    navitem.title = config.title;
 
     // Setting navigation bar visibility is split to mitigate iOS 26 bug with bar button items.
     [navctr setNavigationBarHidden:YES animated:animated];
