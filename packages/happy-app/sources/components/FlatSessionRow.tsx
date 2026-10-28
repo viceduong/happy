@@ -19,12 +19,13 @@ import { RigGitLineChanges } from './RigGitLineChanges';
 import { ShimmerText } from './ShimmerText';
 import { resolveFlatSessionRowPresentation } from '@/utils/flatSessionRowPresentation';
 
-// Roughly three quarters of the row, the proportion a chat list uses: the row
-// is 10 + 61 + 10, so 60 leaves an even 10 either side of the avatar.
-const AVATAR_SIZE = 60;
+// The grouped (by project) list's row geometry, so switching the home list
+// between flat and grouped keeps the same density: a 48pt row, 28pt avatar.
+const ROW_HEIGHT = 48;
+const AVATAR_SIZE = 28;
 const ROW_PADDING_LEFT = 16;
 const AVATAR_GAP = 12;
-const TOP_RIGHT_DOT_SIZE = 20;
+const TOP_RIGHT_DOT_SIZE = 10;
 const TOP_RIGHT_SLOT_MIN_WIDTH = 56;
 const UNREAD_DOT_CLEAR_GRACE_MS = 350;
 
@@ -39,10 +40,10 @@ export function flatListBackgroundColor(theme: Theme): string {
 }
 
 /**
- * One session in the flat home list: avatar, title, the project and worktree it
- * runs in, and its status. The row spans the full width on the page background
- * with a hairline under it, so the list reads as one continuous column rather
- * than a stack of project cards.
+ * One session in the flat home list: avatar, title, the directory (and
+ * worktree) it runs in, and its status, at the grouped list's row size. The row
+ * spans the full width on the page background with a hairline under it, so the
+ * list reads as one continuous column rather than a stack of project cards.
  */
 export const FlatSessionRow = React.memo(({ row, selected, showBorder, archived }: {
     row: FlatSessionRowData;
@@ -144,7 +145,6 @@ export const FlatSessionRow = React.memo(({ row, selected, showBorder, archived 
                     clientId={session.clientId}
                     imageUrl={session.avatarUri}
                     thumbhash={session.avatarThumbhash}
-                    badgeLocation="sessionList"
                 />
             </View>
 
@@ -199,22 +199,21 @@ export const FlatSessionRow = React.memo(({ row, selected, showBorder, archived 
                     </View>
                 </View>
 
-                <Text style={styles.project} numberOfLines={1}>
-                    {projectName}
-                </Text>
-
-                <View style={styles.workspaceRow}>
+                <View style={styles.detailRow}>
                     <View style={styles.workspaceLocation}>
+                        <Text style={styles.directory} numberOfLines={1}>
+                            {projectName}
+                        </Text>
                         {workspaceName && (
                             <>
+                                <Ionicons
+                                    name="git-branch-outline"
+                                    size={12}
+                                    color={theme.colors.textSecondary}
+                                />
                                 <Text style={styles.workspace} numberOfLines={1}>
                                     {workspaceName}
                                 </Text>
-                                <Ionicons
-                                    name="git-branch-outline"
-                                    size={13}
-                                    color={theme.colors.textSecondary}
-                                />
                             </>
                         )}
                     </View>
@@ -222,7 +221,7 @@ export const FlatSessionRow = React.memo(({ row, selected, showBorder, archived 
                         {session.hasDraft && (
                             <Ionicons
                                 name="create-outline"
-                                size={13}
+                                size={12}
                                 color={theme.colors.textSecondary}
                             />
                         )}
@@ -280,13 +279,12 @@ export const FlatSessionRow = React.memo(({ row, selected, showBorder, archived 
 const stylesheet = StyleSheet.create((theme) => ({
     row: {
         flexDirection: 'row',
-        // Centred, not top-aligned: the avatar sits in the middle of the three
-        // text lines the way a chat list draws it, rather than hanging off the
-        // title.
+        // Centred: the avatar sits in the middle of the title and directory
+        // lines rather than hanging off the title.
         alignItems: 'center',
+        height: ROW_HEIGHT,
         paddingLeft: ROW_PADDING_LEFT,
         paddingRight: 16,
-        paddingVertical: 10,
         backgroundColor: flatListBackgroundColor(theme),
     },
     rowSelected: {
@@ -320,7 +318,7 @@ const stylesheet = StyleSheet.create((theme) => ({
     title: {
         fontSize: 17,
         lineHeight: 22,
-        ...Typography.default('semiBold'),
+        ...Typography.default('regular'),
     },
     titleConnected: {
         color: theme.colors.text,
@@ -364,17 +362,17 @@ const stylesheet = StyleSheet.create((theme) => ({
         right: 0,
         justifyContent: 'center',
     },
-    project: {
-        fontSize: 15,
-        lineHeight: 20,
-        color: theme.colors.textSecondary,
-        ...Typography.default('regular'),
-    },
-    workspaceRow: {
+    detailRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 1,
-        minHeight: 18,
+        minHeight: 15,
+    },
+    directory: {
+        flexShrink: 1,
+        fontSize: 12,
+        lineHeight: 15,
+        color: theme.colors.textSecondary,
+        ...Typography.default('regular'),
     },
     workspaceLocation: {
         flex: 1,
@@ -385,8 +383,8 @@ const stylesheet = StyleSheet.create((theme) => ({
     },
     workspace: {
         flexShrink: 1,
-        fontSize: 13,
-        lineHeight: 18,
+        fontSize: 12,
+        lineHeight: 15,
         color: theme.colors.textSecondary,
         ...Typography.default('regular'),
     },
