@@ -49,7 +49,6 @@ import { AllFilesDiffView } from '@/components/AllFilesDiffView';
 import { FileViewPanel } from '@/components/FileViewPanel';
 import { GitFileStatus } from '@/sync/gitStatusFiles';
 import { useOverlayNav } from '@/-session/sessionOverlayNav';
-import { HEADER_DIAGNOSTICS_ENABLED, HeaderDiagnostics } from '@/-session/HeaderDiagnostics';
 import { formatPathRelativeToHome, getResumeCommandBlock, getSessionAvatarId, getSessionName, useSessionStatus } from '@/utils/sessionUtils';
 import { MISSING_SESSION, useSessionQuickActions } from '@/hooks/useSessionQuickActions';
 import { isVersionSupported, MINIMUM_CLI_VERSION } from '@/utils/versionUtils';
@@ -544,7 +543,6 @@ export const SessionView = React.memo((props: { id: string }) => {
                     )}
                 </View>
             )}
-            {HEADER_DIAGNOSTICS_ENABLED && <HeaderDiagnostics />}
         </>
     );
 

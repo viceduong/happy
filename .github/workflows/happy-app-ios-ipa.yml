@@ -24,9 +24,6 @@ jobs:
       APP_ENV: sideload
       SHARP_IGNORE_GLOBAL_LIBVIPS: '1'
       EXPO_NO_TELEMETRY: '1'
-      # TEMPORARY: on-screen header diagnostics for slopus/happy#1890.
-      EXPO_PUBLIC_HEADER_DIAG: '1'
-      HAPPY_HEADER_DIAG: '1'
     steps:
       - uses: actions/checkout@v4
         with:
