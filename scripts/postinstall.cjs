@@ -7,7 +7,7 @@ require('../patches/expose-pierre-diffs-style.cjs');
 require('../patches/force-preact-cjs.cjs');
 require('../patches/fix-pierre-trees-preact-hooks.cjs');
 require('../patches/fix-react-native-audio-api-size-t.cjs');
-require('../patches/fix-react-native-screens-redundant-bar-hide.cjs');
+require('../patches/fix-expo-swiftui-hosting-navigation-bar.cjs');
 require('../patches/diag-react-native-screens-header.cjs');
 require('../patches/fix-flash-list-web-inversion.cjs').patchFlashListWeb();
 require('../patches/fix-virtualized-list-stale-frame-offset.cjs').patchVirtualizedLists();

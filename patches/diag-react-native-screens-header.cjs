@@ -1,11 +1,10 @@
 /**
  * TEMPORARY native diagnostics for slopus/happy#1890. Applied only when
  * HAPPY_HEADER_DIAG=1 (the sideload IPA workflow), after
- * fix-react-native-screens-redundant-bar-hide.cjs.
+ * fix-expo-swiftui-hosting-navigation-bar.cjs.
  *
  * Logs the last 14 navigation-bar events, with a millisecond clock, to an
  * overlay label in the key window (navigation items are left untouched):
- *   R    the fix patch's viewDidAppear re-sync (w/h = hidden before/after)
  *   !!   the stack's bar was un-hidden; following lines are the call stack
  *        (Foundation/KVO frames skipped)
  *   S/H  react-native-screens shows/hides the bar (screen, caller wS/iN,
@@ -221,16 +220,11 @@ void HappyDiagLogStack(NSString *tag)
   // As the header might have change in \`updateViewController\``,
     },
     {
-        // The fix patch's guarded hide.
         file: 'react-native-screens/ios/RNSScreenStackHeaderConfig.mm',
-        find: `    if (!wasHidden) {
-      [navctr setNavigationBarHidden:YES animated:animated && navctr.transitionCoordinator == nil];
-    }
+        find: `    [navctr setNavigationBarHidden:YES animated:animated];
     return;
   }`,
-        replace: `    if (!wasHidden) {
-      [navctr setNavigationBarHidden:YES animated:animated && navctr.transitionCoordinator == nil];
-    }
+        replace: `    [navctr setNavigationBarHidden:YES animated:animated];
     // ${MARKER}
     HappyDiagLogEvent([NSString stringWithFormat:@"H %@ %@ a%d t%d w%d>h%d n%lu",
                                                  HappyDiagShortTitle(config.title),
@@ -303,20 +297,6 @@ void HappyDiagScanBars(NSString *tag, UINavigationController *nav);`,
   if (self.navigationController != nil) {
     HappyDiagScanBars([NSString stringWithFormat:@"dA %@", HappyDiagShortTitle([self.screenView findHeaderConfig].title)],
                       self.navigationController);
-  }`,
-    },
-    {
-        // The fix patch's viewDidAppear re-sync.
-        file: 'react-native-screens/ios/RNSScreen.mm',
-        find: `    [RNSScreenStackHeaderConfig willShowViewController:self animated:NO withConfig:[self.screenView findHeaderConfig]];
-  }`,
-        replace: `    BOOL happyDiagWasHidden = self.navigationController.navigationBarHidden; // ${MARKER}
-    [RNSScreenStackHeaderConfig willShowViewController:self animated:NO withConfig:[self.screenView findHeaderConfig]];
-    HappyDiagLogEvent([NSString stringWithFormat:@"R %@ t%d w%d>h%d",
-                                                 HappyDiagShortTitle([self.screenView findHeaderConfig].title),
-                                                 (int)(self.transitionCoordinator != nil),
-                                                 (int)happyDiagWasHidden,
-                                                 (int)self.navigationController.navigationBarHidden]);
   }`,
     },
     {
