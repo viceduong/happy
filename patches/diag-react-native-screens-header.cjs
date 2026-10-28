@@ -45,6 +45,7 @@ NSString *HappyDiagShortTitle(NSString *title)
 
 static UIWindow *HappyDiagKeyWindow(void)
 {
+  UIWindow *fallback = nil;
   for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
     if (![scene isKindOfClass:UIWindowScene.class]) {
       continue;
@@ -53,9 +54,23 @@ static UIWindow *HappyDiagKeyWindow(void)
       if (window.isKeyWindow) {
         return window;
       }
+      if (fallback == nil && !window.hidden && window.windowLevel == UIWindowLevelNormal) {
+        fallback = window;
+      }
     }
   }
-  return nil;
+  if (fallback != nil) {
+    return fallback;
+  }
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+  for (UIWindow *window in UIApplication.sharedApplication.windows) {
+    if (!window.hidden) {
+      return window;
+    }
+  }
+#pragma clang diagnostic pop
+  return UIApplication.sharedApplication.delegate.window;
 }
 
 static void HappyDiagUpdateOverlay(void)
