@@ -6,6 +6,8 @@
  * Logs the last 14 navigation-bar events, with a millisecond clock, to an
  * overlay label in the key window (navigation items are left untouched):
  *   R    the fix patch's viewDidAppear re-sync (w/h = hidden before/after)
+ *   !!   the stack's bar was un-hidden; following lines are the call stack
+ *        (Foundation/KVO frames skipped)
  *   S/H  react-native-screens shows/hides the bar (screen, caller wS/iN,
  *        a=animated, t=in transition, w=hidden before, h=hidden after)
  *   V    scan of every UINavigationBar actually visible in the window:
@@ -105,7 +107,7 @@ NSString *HappyDiagLogEvent(NSString *event)
   }
   int ms = (int)((CACurrentMediaTime() - gHappyDiagStart) * 1000) % 100000;
   [gHappyDiagEvents addObject:[NSString stringWithFormat:@"%05d %@", ms, event]];
-  while (gHappyDiagEvents.count > 14) {
+  while (gHappyDiagEvents.count > 26) {
     [gHappyDiagEvents removeObjectAtIndex:0];
   }
   HappyDiagUpdateOverlay();
@@ -163,6 +165,43 @@ void HappyDiagScanBars(NSString *tag, UINavigationController *nav)
                                                (unsigned long)visible.count,
                                                (unsigned long)bars.count,
                                                [visible componentsJoinedByString:@"; "]]);
+}
+
+void HappyDiagLogStack(NSString *tag)
+{
+  NSArray<NSString *> *symbols = [NSThread callStackSymbols];
+  HappyDiagLogEvent([NSString stringWithFormat:@"!! %@", tag]);
+  NSCharacterSet *spaces = NSCharacterSet.whitespaceCharacterSet;
+  NSUInteger shown = 0;
+  for (NSUInteger i = 1; i < symbols.count && shown < 9; i++) {
+    NSMutableArray<NSString *> *parts = [NSMutableArray new];
+    for (NSString *part in [symbols[i] componentsSeparatedByCharactersInSet:spaces]) {
+      if (part.length > 0) {
+        [parts addObject:part];
+      }
+    }
+    if (parts.count < 4) {
+      continue;
+    }
+    NSString *module = parts[1];
+    if ([module isEqualToString:@"Foundation"] || [module isEqualToString:@"CoreFoundation"] ||
+        [module hasPrefix:@"libobjc"] || [module hasPrefix:@"libsystem"]) {
+      continue;
+    }
+    NSString *method = [[parts subarrayWithRange:NSMakeRange(3, parts.count - 3)] componentsJoinedByString:@" "];
+    NSRange plus = [method rangeOfString:@" + " options:NSBackwardsSearch];
+    if (plus.location != NSNotFound) {
+      method = [method substringToIndex:plus.location];
+    }
+    if (method.length > 64) {
+      method = [method substringToIndex:64];
+    }
+    if (module.length > 8) {
+      module = [module substringToIndex:8];
+    }
+    HappyDiagLogEvent([NSString stringWithFormat:@"  %@ %@", module, method]);
+    shown++;
+  }
 }
 
 @implementation RNSScreenStackHeaderConfig {`,
@@ -279,6 +318,64 @@ void HappyDiagScanBars(NSString *tag, UINavigationController *nav);`,
                                                  (int)happyDiagWasHidden,
                                                  (int)self.navigationController.navigationBarHidden]);
   }`,
+    },
+    {
+        file: 'react-native-screens/ios/RNSScreenStack.mm',
+        find: `@implementation RNSNavigationController
+`,
+        replace: `// ${MARKER}: catch whoever un-hides the stack's navigation bar.
+NSString *HappyDiagLogEvent(NSString *event);
+void HappyDiagLogStack(NSString *tag);
+static int kHappyDiagBarHiddenContext;
+
+@implementation RNSNavigationController
+
+- (void)viewDidLoad
+{
+  [super viewDidLoad];
+  [self.navigationBar addObserver:self
+                       forKeyPath:@"hidden"
+                          options:NSKeyValueObservingOptionOld | NSKeyValueObservingOptionNew
+                          context:&kHappyDiagBarHiddenContext];
+}
+
+- (void)dealloc
+{
+  if (self.isViewLoaded) {
+    [self.navigationBar removeObserver:self forKeyPath:@"hidden" context:&kHappyDiagBarHiddenContext];
+  }
+}
+
+- (void)observeValueForKeyPath:(NSString *)keyPath
+                      ofObject:(id)object
+                        change:(NSDictionary<NSKeyValueChangeKey, id> *)change
+                       context:(void *)context
+{
+  if (context == &kHappyDiagBarHiddenContext) {
+    if ([change[NSKeyValueChangeOldKey] boolValue] && ![change[NSKeyValueChangeNewKey] boolValue]) {
+      HappyDiagLogStack(@"bar.hidden = NO");
+    }
+    return;
+  }
+  [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
+}
+
+- (void)setNavigationBarHidden:(BOOL)hidden animated:(BOOL)animated
+{
+  if (!hidden && self.navigationBarHidden) {
+    HappyDiagLogStack([NSString stringWithFormat:@"setNavigationBarHidden:NO animated:%d", (int)animated]);
+  }
+  [super setNavigationBarHidden:hidden animated:animated];
+}
+
+- (void)setNavigationBarHidden:(BOOL)hidden
+{
+  if (!hidden && self.navigationBarHidden) {
+    HappyDiagLogStack(@"setNavigationBarHidden:NO");
+  }
+  [super setNavigationBarHidden:hidden];
+}
+`,
     },
 ];
 
