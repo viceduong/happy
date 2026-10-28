@@ -12,14 +12,16 @@
  * when the animation runs (measured: hidden after the call, visible again in
  * the first animation frame and afterwards). Non-animated hides stick.
  *
- * Any bar change made from that delegate callback is undone when the push/pop
- * animation starts: UIKit has captured the bar state by then (viewWillAppear:
- * runs first). Non-animated hides made after the transition stick.
+ * Any bar change made once a push/pop has started, from that delegate or
+ * from viewWillAppear:, is undone when the animation starts: UIKit restores
+ * the bar state it had when the transition began. Changes made after the
+ * transition stick (measured on device).
  *
- * 1. Apply the screen's header visibility in viewWillAppear:, Apple's place
- *    for setNavigationBarHidden:animated:, before the transition captures it.
- * 2. In the delegate path, only hide a visible bar (so the change already made
- *    in viewWillAppear: is not redone), and not animated inside a transition.
+ * 1. Only hide a visible bar, and not animated inside a transition, so a push
+ *    that starts with the bar hidden never touches it.
+ * 2. Re-sync the bar with the screen's header in viewDidAppear:, so every
+ *    transition starts from the right state (including after launch, where
+ *    the hidden-header home screen otherwise kept a visible, empty bar).
  */
 const fs = require('fs');
 const path = require('path');
@@ -51,18 +53,16 @@ const edits = [
     },
     {
         file: 'react-native-screens/ios/RNSScreen.mm',
-        find: `- (void)viewWillAppear:(BOOL)animated
-{
-  [super viewWillAppear:animated];`,
-        replace: `- (void)viewWillAppear:(BOOL)animated
-{
-  [super viewWillAppear:animated];
-  // ${MARKER}: set the bar's visibility here, where UIKit expects it. On
-  // iOS 15 a change made later, from navigationController:willShowViewController:,
-  // is undone when the push/pop animation starts.
+        find: `  [super viewDidAppear:animated];
+  if (!_isSwiping || _shouldNotify) {`,
+        replace: `  [super viewDidAppear:animated];
+  // ${MARKER}: re-sync the bar with this screen's header once it is on
+  // screen. A change made during a push/pop is undone by iOS 15; the next
+  // transition must start from the right state so it never has to change it.
   if (self.navigationController != nil && self.navigationController.topViewController == self) {
-    [RNSScreenStackHeaderConfig willShowViewController:self animated:animated withConfig:[self.screenView findHeaderConfig]];
-  }`,
+    [RNSScreenStackHeaderConfig willShowViewController:self animated:NO withConfig:[self.screenView findHeaderConfig]];
+  }
+  if (!_isSwiping || _shouldNotify) {`,
     },
 ];
 

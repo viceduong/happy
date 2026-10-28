@@ -5,7 +5,7 @@
  *
  * Logs the last 14 navigation-bar events, with a millisecond clock, to an
  * overlay label in the key window (navigation items are left untouched):
- *   W    the fix patch's viewWillAppear apply (w/h = hidden before/after)
+ *   R    the fix patch's viewDidAppear re-sync (w/h = hidden before/after)
  *   S/H  react-native-screens shows/hides the bar (screen, caller wS/iN,
  *        a=animated, t=in transition, w=hidden before, h=hidden after)
  *   V    scan of every UINavigationBar actually visible in the window:
@@ -221,21 +221,6 @@ void HappyDiagScanBars(NSString *tag, UINavigationController *nav)
                                                (int)(vc == navctr.topViewController)]);`,
     },
     {
-        // The fix patch's viewWillAppear apply.
-        file: 'react-native-screens/ios/RNSScreen.mm',
-        find: `    [RNSScreenStackHeaderConfig willShowViewController:self animated:animated withConfig:[self.screenView findHeaderConfig]];
-  }`,
-        replace: `    BOOL happyDiagWasHidden = self.navigationController.navigationBarHidden; // ${MARKER}
-    [RNSScreenStackHeaderConfig willShowViewController:self animated:animated withConfig:[self.screenView findHeaderConfig]];
-    HappyDiagLogEvent([NSString stringWithFormat:@"W %@ a%d t%d w%d>h%d",
-                                                 HappyDiagShortTitle([self.screenView findHeaderConfig].title),
-                                                 (int)animated,
-                                                 (int)(self.transitionCoordinator != nil),
-                                                 (int)happyDiagWasHidden,
-                                                 (int)self.navigationController.navigationBarHidden]);
-  }`,
-    },
-    {
         file: 'react-native-screens/ios/RNSScreen.mm',
         find: `#import "RNSScreenStackHeaderConfig.h"`,
         replace: `#import "RNSScreenStackHeaderConfig.h"
@@ -273,15 +258,27 @@ void HappyDiagScanBars(NSString *tag, UINavigationController *nav);`,
     },
     {
         file: 'react-native-screens/ios/RNSScreen.mm',
-        find: `  [super viewDidAppear:animated];
-  if (!_isSwiping || _shouldNotify) {`,
+        find: `  [super viewDidAppear:animated];`,
         replace: `  [super viewDidAppear:animated];
   // ${MARKER}
   if (self.navigationController != nil) {
     HappyDiagScanBars([NSString stringWithFormat:@"dA %@", HappyDiagShortTitle([self.screenView findHeaderConfig].title)],
                       self.navigationController);
-  }
-  if (!_isSwiping || _shouldNotify) {`,
+  }`,
+    },
+    {
+        // The fix patch's viewDidAppear re-sync.
+        file: 'react-native-screens/ios/RNSScreen.mm',
+        find: `    [RNSScreenStackHeaderConfig willShowViewController:self animated:NO withConfig:[self.screenView findHeaderConfig]];
+  }`,
+        replace: `    BOOL happyDiagWasHidden = self.navigationController.navigationBarHidden; // ${MARKER}
+    [RNSScreenStackHeaderConfig willShowViewController:self animated:NO withConfig:[self.screenView findHeaderConfig]];
+    HappyDiagLogEvent([NSString stringWithFormat:@"R %@ t%d w%d>h%d",
+                                                 HappyDiagShortTitle([self.screenView findHeaderConfig].title),
+                                                 (int)(self.transitionCoordinator != nil),
+                                                 (int)happyDiagWasHidden,
+                                                 (int)self.navigationController.navigationBarHidden]);
+  }`,
     },
 ];
 
