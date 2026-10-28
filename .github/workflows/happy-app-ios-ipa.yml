@@ -1,19 +1,29 @@
 name: happy-app-ios-ipa
 
-# Unsigned Release IPA of packages/happy-app for sideloading (TrollStore,
-# Sideloadly, AltStore) on older iPhones, e.g. iOS 15.x. Built with the
-# `sideload` variant: its own bundle id, OTA updates disabled.
+# Release IPA of packages/happy-app for sideloading on older iPhones, e.g.
+# iOS 15.x. Both variants disable OTA updates.
+#   sideload    own bundle id, unsigned (TrollStore, Sideloadly, AltStore),
+#               installs next to the App Store app; no push notifications.
+#   trollstore  the App Store app id (com.ex3ndr.happy), ldid-signed with its
+#               entitlements incl. aps-environment; replaces the App Store
+#               install via TrollStore and receives its push notifications.
 
 on:
   push:
     branches: [ios15-build]
   workflow_dispatch:
+    inputs:
+      variant:
+        description: App variant
+        type: choice
+        options: [sideload, trollstore]
+        default: sideload
 
 permissions:
   contents: read
 
 concurrency:
-  group: happy-app-ios-ipa-${{ github.ref }}
+  group: happy-app-ios-ipa-${{ github.ref }}-${{ inputs.variant || 'sideload' }}
   cancel-in-progress: true
 
 jobs:
@@ -21,7 +31,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 90
     env:
-      APP_ENV: sideload
+      APP_ENV: ${{ inputs.variant || 'sideload' }}
       SHARP_IGNORE_GLOBAL_LIBVIPS: '1'
       EXPO_NO_TELEMETRY: '1'
     steps:
@@ -82,6 +92,36 @@ jobs:
           grep -E 'error:|\*\* BUILD' "$RUNNER_TEMP/xcodebuild.log" | head -60 || true
           exit "$STATUS"
 
+      # TrollStore keeps the entitlements of the main binary's signature.
+      # Start from Expo's generated entitlements (aps-environment from
+      # expo-notifications) and add the App Store app's identifiers, so iOS
+      # issues push tokens for com.ex3ndr.happy and its keychain stays shared.
+      - name: Sign with entitlements (trollstore)
+        if: env.APP_ENV == 'trollstore'
+        run: |
+          set -euo pipefail
+          brew install ldid
+          APP_PATH=$(find "$RUNNER_TEMP/dd/Build/Products/Release-iphoneos" -maxdepth 1 -name '*.app' -type d | head -1)
+          EXEC=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP_PATH/Info.plist")
+          SRC=$(find packages/happy-app/ios -maxdepth 2 -name '*.entitlements' | head -1)
+          ENT="$RUNNER_TEMP/app.entitlements"
+          if [ -n "$SRC" ]; then cp "$SRC" "$ENT"; else plutil -create xml1 "$ENT"; fi
+          TEAM=466DQWDR8C
+          APP_ID="$TEAM.com.ex3ndr.happy"
+          PB=/usr/libexec/PlistBuddy
+          for KEY in application-identifier com.apple.developer.team-identifier keychain-access-groups aps-environment get-task-allow; do
+            $PB -c "Delete :$KEY" "$ENT" 2>/dev/null || true
+          done
+          $PB -c "Add :application-identifier string $APP_ID" "$ENT"
+          $PB -c "Add :com.apple.developer.team-identifier string $TEAM" "$ENT"
+          $PB -c "Add :keychain-access-groups array" "$ENT"
+          $PB -c "Add :keychain-access-groups:0 string $APP_ID" "$ENT"
+          $PB -c "Add :aps-environment string production" "$ENT"
+          $PB -c "Add :get-task-allow bool false" "$ENT"
+          echo "Entitlements:"; plutil -p "$ENT"
+          ldid -S"$ENT" "$APP_PATH/$EXEC"
+          echo "Signed entitlements:"; ldid -e "$APP_PATH/$EXEC"
+
       - name: Package .ipa
         run: |
           set -euo pipefail
@@ -94,14 +134,14 @@ jobs:
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
           SHORT_SHA="${GITHUB_SHA::7}"
-          zip -qr "Happy-sideload-$SHORT_SHA.ipa" Payload
-          ls -la Happy-sideload-*.ipa
+          zip -qr "Happy-$APP_ENV-$SHORT_SHA.ipa" Payload
+          ls -la Happy-*.ipa
 
       - name: Upload .ipa
         uses: actions/upload-artifact@v4
         with:
-          name: Happy-sideload-ipa
-          path: Happy-sideload-*.ipa
+          name: Happy-${{ env.APP_ENV }}-ipa
+          path: Happy-*.ipa
           retention-days: 14
 
       - name: Upload build log
