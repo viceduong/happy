@@ -1,7 +1,8 @@
 name: happy-app-ios-ipa
 
 # Release IPA of packages/happy-app for sideloading on older iPhones, e.g.
-# iOS 15.x. Both variants disable OTA updates.
+# iOS 15.x. Both variants disable OTA updates. Pushes build `trollstore`;
+# `sideload` is built on demand (workflow_dispatch).
 #   sideload    own bundle id, unsigned (TrollStore, Sideloadly, AltStore),
 #               installs next to the App Store app; no push notifications.
 #   trollstore  the App Store app id (com.ex3ndr.happy), ldid-signed with its
@@ -17,13 +18,13 @@ on:
         description: App variant
         type: choice
         options: [sideload, trollstore]
-        default: sideload
+        default: trollstore
 
 permissions:
   contents: read
 
 concurrency:
-  group: happy-app-ios-ipa-${{ github.ref }}-${{ inputs.variant || 'sideload' }}
+  group: happy-app-ios-ipa-${{ github.ref }}-${{ inputs.variant || 'trollstore' }}
   cancel-in-progress: true
 
 jobs:
@@ -31,7 +32,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 90
     env:
-      APP_ENV: ${{ inputs.variant || 'sideload' }}
+      APP_ENV: ${{ inputs.variant || 'trollstore' }}
       SHARP_IGNORE_GLOBAL_LIBVIPS: '1'
       EXPO_NO_TELEMETRY: '1'
     steps:
