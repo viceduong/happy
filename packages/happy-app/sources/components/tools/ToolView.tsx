@@ -24,6 +24,7 @@ import {
     shouldUseCompactToolRow,
 } from '@/utils/toolDisplay';
 import { useSetting } from '@/sync/storage';
+import { chatFont } from '@/constants/chatTypography';
 
 interface ToolViewProps {
     metadata: Metadata | null;
@@ -387,29 +388,29 @@ const styles = StyleSheet.create((theme) => ({
         marginLeft: 8,
     },
     elapsedText: {
-        fontSize: 13,
+        fontSize: chatFont(13),
         color: theme.colors.textSecondary,
         fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }),
     },
     toolName: {
-        fontSize: 14,
+        fontSize: chatFont(14),
         fontWeight: '500',
         color: theme.colors.text,
     },
     compactActivityText: {
         flex: 1,
         minWidth: 0,
-        fontSize: 15,
-        lineHeight: 20,
+        fontSize: chatFont(15),
+        lineHeight: chatFont(20),
         color: theme.colors.textSecondary,
     },
     status: {
         fontWeight: '400',
         opacity: 0.3,
-        fontSize: 15,
+        fontSize: chatFont(15),
     },
     toolDescription: {
-        fontSize: 13,
+        fontSize: chatFont(13),
         color: theme.colors.textSecondary,
         marginTop: 2,
     },

@@ -2,6 +2,7 @@ import React from 'react';
 import { Text, View } from 'react-native';
 import { useUnistyles } from 'react-native-unistyles';
 import { Typography } from '@/constants/Typography';
+import { chatFont } from '@/constants/chatTypography';
 
 interface SimpleSyntaxHighlighterProps {
   code: string;
@@ -299,8 +300,8 @@ export const SimpleSyntaxHighlighter: React.FC<SimpleSyntaxHighlighterProps> = (
         selectable={selectable}
         style={{ 
           fontFamily: Typography.mono().fontFamily,
-          fontSize: 14,
-          lineHeight: 20,
+          fontSize: chatFont(14),
+          lineHeight: chatFont(20),
         }}
       >
         {tokens.map((token, index) => (

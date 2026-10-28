@@ -7,6 +7,7 @@ import { getToolActivityLabel, getToolDisplayTitle, isTerminalToolName } from '@
 import { Typography } from '@/constants/Typography';
 import { t } from '@/text';
 import { StyleSheet } from 'react-native-unistyles';
+import { chatFont } from '@/constants/chatTypography';
 
 interface ToolHeaderProps {
     tool?: ToolCall;
@@ -37,8 +38,8 @@ export function ToolHeader({ tool, metadata = null }: ToolHeaderProps) {
 const styles = StyleSheet.create((theme) => ({
     title: {
         ...Typography.default('semiBold'),
-        fontSize: Platform.OS === 'web' ? 17 : 16,
-        lineHeight: 20,
+        fontSize: chatFont(Platform.OS === 'web' ? 17 : 16),
+        lineHeight: chatFont(20),
         color: theme.colors.header.tint,
         textAlign: 'center',
         maxWidth: '100%',

@@ -17,6 +17,7 @@ import { Typography } from '@/constants/Typography';
 import { parseLocalCommandMessage, isUserSlashCommandEcho } from './parseLocalCommandMessage';
 import { resolveUserMessageBubbleColor } from '@/utils/userMessageBubbleColor';
 import { LongPressCopyable } from './LongPressCopyable';
+import { chatFont } from '@/constants/chatTypography';
 
 
 export const MessageView = React.memo((props: {
@@ -438,7 +439,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   goalSentText: {
     color: theme.colors.agentEventText,
-    fontSize: 14,
+    fontSize: chatFont(14),
   },
   commandChip: {
     backgroundColor: theme.colors.userMessageBackground,
@@ -453,7 +454,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   commandChipText: {
     color: theme.colors.input.text,
-    fontSize: 13,
+    fontSize: chatFont(13),
     fontFamily: 'monospace',
   },
   agentMessageContainer: {
@@ -499,8 +500,8 @@ const styles = StyleSheet.create((theme) => ({
   },
   userMessageAuthorText: {
     color: theme.colors.text,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: chatFont(14),
+    lineHeight: chatFont(20),
     marginBottom: 4,
     paddingHorizontal: 12,
     maxWidth: '100%',
@@ -515,10 +516,10 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.agentEventText,
     // Matches the status line above the composer, the app's other place for
     // saying what the session is doing right now.
-    fontSize: 11,
+    fontSize: chatFont(11),
     // Fixed so an empty line and a long error take the same space.
-    lineHeight: 14,
-    height: 14,
+    lineHeight: chatFont(14),
+    height: chatFont(14),
     marginBottom: 4,
     marginTop: 2,
     ...Typography.default(),
@@ -533,7 +534,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   agentEventText: {
     color: theme.colors.agentEventText,
-    fontSize: 14,
+    fontSize: chatFont(14),
   },
   toolContainer: {
     marginHorizontal: 8,
@@ -542,6 +543,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   debugText: {
     color: theme.colors.agentEventText,
-    fontSize: 12,
+    fontSize: chatFont(12),
   },
 }));

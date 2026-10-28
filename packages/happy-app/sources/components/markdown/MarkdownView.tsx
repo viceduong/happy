@@ -17,6 +17,7 @@ import { MermaidRenderer } from './MermaidRenderer';
 import { t } from '@/text';
 import { isHttpMarkdownLink } from './linkUtils';
 import { openExternalUrl } from '@/utils/openExternalUrl';
+import { chatFont } from '@/constants/chatTypography';
 
 // Option type for callback
 export type Option = {
@@ -390,8 +391,8 @@ const style = StyleSheet.create((theme) => ({
 
     text: {
         ...Typography.default(),
-        fontSize: 16,
-        lineHeight: 25,
+        fontSize: chatFont(16),
+        lineHeight: chatFont(25),
         marginTop: 8,
         marginBottom: 10,
         color: theme.colors.text,
@@ -411,8 +412,8 @@ const style = StyleSheet.create((theme) => ({
     },
     code: {
         ...Typography.mono(),
-        fontSize: 16,
-        lineHeight: 24,
+        fontSize: chatFont(16),
+        lineHeight: chatFont(24),
         color: theme.colors.text,
     },
     link: {
@@ -430,41 +431,41 @@ const style = StyleSheet.create((theme) => ({
         color: theme.colors.text,
     },
     header1: {
-        fontSize: 16,
-        lineHeight: 24,  // Reduced from 36 to 24
+        fontSize: chatFont(16),
+        lineHeight: chatFont(24),  // Reduced from 36 to 24
         fontWeight: '900',
         marginTop: 16,
         marginBottom: 8
     },
     header2: {
-        fontSize: 20,
-        lineHeight: 24,  // Reduced from 36 to 32
+        fontSize: chatFont(20),
+        lineHeight: chatFont(24),  // Reduced from 36 to 32
         fontWeight: '600',
         marginTop: 16,
         marginBottom: 8
     },
     header3: {
-        fontSize: 16,
-        lineHeight: 28,  // Reduced from 32 to 28
+        fontSize: chatFont(16),
+        lineHeight: chatFont(28),  // Reduced from 32 to 28
         fontWeight: '600',
         marginTop: 16,
         marginBottom: 8,
     },
     header4: {
-        fontSize: 16,
-        lineHeight: 24,
+        fontSize: chatFont(16),
+        lineHeight: chatFont(24),
         fontWeight: '600',
         marginTop: 8,
         marginBottom: 8,
     },
     header5: {
-        fontSize: 16,
-        lineHeight: 24,  // Reduced from 28 to 24
+        fontSize: chatFont(16),
+        lineHeight: chatFont(24),  // Reduced from 28 to 24
         fontWeight: '600'
     },
     header6: {
-        fontSize: 16,
-        lineHeight: 24, // Reduced from 28 to 24
+        fontSize: chatFont(16),
+        lineHeight: chatFont(24), // Reduced from 28 to 24
         fontWeight: '600'
     },
 
@@ -518,7 +519,7 @@ const style = StyleSheet.create((theme) => ({
     codeLanguage: {
         ...Typography.mono(),
         color: theme.colors.textSecondary,
-        fontSize: 12,
+        fontSize: chatFont(12),
         marginTop: 8,
         paddingHorizontal: 16,
         marginBottom: 0,
@@ -526,8 +527,8 @@ const style = StyleSheet.create((theme) => ({
     codeText: {
         ...Typography.mono(),
         color: theme.colors.text,
-        fontSize: 14,
-        lineHeight: 20,
+        fontSize: chatFont(14),
+        lineHeight: chatFont(20),
     },
     horizontalRule: {
         height: 1,
@@ -551,8 +552,8 @@ const style = StyleSheet.create((theme) => ({
     },
     imageCaption: {
         ...Typography.default(),
-        fontSize: 14,
-        lineHeight: 20,
+        fontSize: chatFont(14),
+        lineHeight: chatFont(20),
         color: theme.colors.textSecondary,
     },
     copyButtonContainer: {
@@ -586,8 +587,8 @@ const style = StyleSheet.create((theme) => ({
     copyButtonText: {
         ...Typography.default(),
         color: theme.colors.text,
-        fontSize: 12,
-        lineHeight: 16,
+        fontSize: chatFont(12),
+        lineHeight: chatFont(16),
     },
 
     //
@@ -617,8 +618,8 @@ const style = StyleSheet.create((theme) => ({
     },
     optionText: {
         ...Typography.default(),
-        fontSize: 16,
-        lineHeight: 24,
+        fontSize: chatFont(16),
+        lineHeight: chatFont(24),
         color: theme.colors.text,
     },
     // Tapping an option sends it as your message. Full-width rows in the
@@ -635,8 +636,8 @@ const style = StyleSheet.create((theme) => ({
     },
     optionButtonText: {
         ...Typography.default(),
-        fontSize: 16,
-        lineHeight: 24,
+        fontSize: chatFont(16),
+        lineHeight: chatFont(24),
         color: theme.colors.text,
     },
 
@@ -680,14 +681,14 @@ const style = StyleSheet.create((theme) => ({
     tableHeaderText: {
         ...Typography.default('semiBold'),
         color: theme.colors.text,
-        fontSize: 16,
-        lineHeight: 24,
+        fontSize: chatFont(16),
+        lineHeight: chatFont(24),
     },
     tableCellText: {
         ...Typography.default(),
         color: theme.colors.text,
-        fontSize: 16,
-        lineHeight: 24,
+        fontSize: chatFont(16),
+        lineHeight: chatFont(24),
     },
 
     // Add global style for Web platform (Unistyles supports this via compiler plugin)
