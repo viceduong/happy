@@ -12,8 +12,14 @@
  * when the animation runs (measured: hidden after the call, visible again in
  * the first animation frame and afterwards). Non-animated hides stick.
  *
- * Only hide the bar when it is actually visible, and without animation while
- * a transition is in progress.
+ * Any bar change made from that delegate callback is undone when the push/pop
+ * animation starts: UIKit has captured the bar state by then (viewWillAppear:
+ * runs first). Non-animated hides made after the transition stick.
+ *
+ * 1. Apply the screen's header visibility in viewWillAppear:, Apple's place
+ *    for setNavigationBarHidden:animated:, before the transition captures it.
+ * 2. In the delegate path, only hide a visible bar (so the change already made
+ *    in viewWillAppear: is not redone), and not animated inside a transition.
  */
 const fs = require('fs');
 const path = require('path');
@@ -41,6 +47,21 @@ const edits = [
       [navctr setNavigationBarHidden:YES animated:animated && navctr.transitionCoordinator == nil];
     }
     return;
+  }`,
+    },
+    {
+        file: 'react-native-screens/ios/RNSScreen.mm',
+        find: `- (void)viewWillAppear:(BOOL)animated
+{
+  [super viewWillAppear:animated];`,
+        replace: `- (void)viewWillAppear:(BOOL)animated
+{
+  [super viewWillAppear:animated];
+  // ${MARKER}: set the bar's visibility here, where UIKit expects it. On
+  // iOS 15 a change made later, from navigationController:willShowViewController:,
+  // is undone when the push/pop animation starts.
+  if (self.navigationController != nil && self.navigationController.topViewController == self) {
+    [RNSScreenStackHeaderConfig willShowViewController:self animated:animated withConfig:[self.screenView findHeaderConfig]];
   }`,
     },
 ];
