@@ -198,13 +198,13 @@ void HappyDiagScanBars(NSString *tag, UINavigationController *nav)
     },
     {
         file: 'react-native-screens/ios/RNSScreenStackHeaderConfig.mm',
-        find: `    navitem.title = config.title;
+        find: `    navitem.rightBarButtonItems = nil;
 
     // Setting navigation bar visibility is split to mitigate iOS 26 bug with bar button items.
     [navctr setNavigationBarHidden:YES animated:animated];
     return;
   }`,
-        replace: `    navitem.title = config.title;
+        replace: `    navitem.rightBarButtonItems = nil;
 
     // Setting navigation bar visibility is split to mitigate iOS 26 bug with bar button items.
     [navctr setNavigationBarHidden:YES animated:animated];
@@ -235,6 +235,20 @@ void HappyDiagScanBars(NSString *tag, UINavigationController *nav)
                                                (int)wasHidden,
                                                (int)navctr.navigationBarHidden,
                                                (int)(vc == navctr.topViewController)]);`,
+    },
+    {
+        // The fix patch's hide in the first animation frame.
+        file: 'react-native-screens/ios/RNSScreen.mm',
+        find: `          if (!wantsBar) {
+            [nav setNavigationBarHidden:YES animated:NO];
+          }`,
+        replace: `          if (!wantsBar) {
+            [nav setNavigationBarHidden:YES animated:NO];
+          }
+          HappyDiagLogEvent([NSString stringWithFormat:@"E %@ want%d >h%d", // ${MARKER}
+                                                       HappyDiagShortTitle(config.title),
+                                                       (int)wantsBar,
+                                                       (int)nav.navigationBarHidden]);`,
     },
     {
         file: 'react-native-screens/ios/RNSScreen.mm',

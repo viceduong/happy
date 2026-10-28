@@ -11,10 +11,18 @@
  * leaves the (transparent, empty) bar visible on home, and the next push
  * shows it with the pushed screen's navigation item.
  *
+ * It also un-hides the bar by itself when a push animation starts, even when
+ * it is already hidden (measured on iOS 15.6.1: hidden at viewWillAppear,
+ * visible in the first animateAlongsideTransition frame).
+ *
  * 1. When the bar is hidden during a transition, hide it again (without
  *    animation) when that transition completes, if the screen is still on top
  *    and still wants no header.
- * 2. Re-apply the top screen's header config when it appears, as a safety net.
+ * 2. Leave the navigation item of a headerless screen empty (no route-name
+ *    title, no bar button items), so a bar drawn anyway shows nothing.
+ * 3. Hide the bar again in the first animation frame of a transition to a
+ *    headerless screen.
+ * 4. Re-apply the top screen's header config when it appears, as a safety net.
  */
 const fs = require('fs');
 const path = require('path');
@@ -57,8 +65,45 @@ const edits = [
                                    }];
     }
 
-    navitem.title = config.title;
+    // ${MARKER}: nothing to show if UIKit draws the bar for a frame anyway.
+    navitem.title = nil;
+    navitem.titleView = nil;
+    navitem.leftBarButtonItems = nil;
+    navitem.rightBarButtonItems = nil;
 `,
+    },
+    {
+        file: 'react-native-screens/ios/RNSScreen.mm',
+        find: `- (void)viewWillAppear:(BOOL)animated
+{
+  [super viewWillAppear:animated];`,
+        replace: `- (void)viewWillAppear:(BOOL)animated
+{
+  [super viewWillAppear:animated];
+  // ${MARKER}: iOS 15 un-hides the bar when the push animation starts, even
+  // though it is hidden; hide it again in that same frame for a screen
+  // without a header.
+  if (self.navigationController != nil && self.transitionCoordinator != nil) {
+    __weak RNSScreen *weakSelf = self;
+    [self.transitionCoordinator
+        animateAlongsideTransition:^(id<UIViewControllerTransitionCoordinatorContext> context) {
+          RNSScreen *strongSelf = weakSelf;
+          UINavigationController *nav = strongSelf.navigationController;
+          if (strongSelf == nil || nav == nil || nav.topViewController != strongSelf || nav.navigationBarHidden) {
+            return;
+          }
+          RNSScreenStackHeaderConfig *config = [strongSelf.screenView findHeaderConfig];
+#ifdef RCT_NEW_ARCH_ENABLED
+          BOOL wantsBar = config != nil && config.show;
+#else
+          BOOL wantsBar = config != nil && !config.hide;
+#endif
+          if (!wantsBar) {
+            [nav setNavigationBarHidden:YES animated:NO];
+          }
+        }
+                        completion:nil];
+  }`,
     },
     {
         file: 'react-native-screens/ios/RNSScreen.mm',
