@@ -8,7 +8,12 @@
  * in the first animation frame), so the session screen showed UIKit's bar with
  * "session/[id]" and "Back" under the app's own header (slopus/happy#1890).
  *
- * Only hide the bar when it is actually visible.
+ * An animated hide of a visible bar inside a transition is likewise reverted
+ * when the animation runs (measured: hidden after the call, visible again in
+ * the first animation frame and afterwards). Non-animated hides stick.
+ *
+ * Only hide the bar when it is actually visible, and without animation while
+ * a transition is in progress.
  */
 const fs = require('fs');
 const path = require('path');
@@ -28,10 +33,12 @@ const edits = [
     return;
   }`,
         replace: `    // Setting navigation bar visibility is split to mitigate iOS 26 bug with bar button items.
-    // ${MARKER}: an animated hide of an already hidden bar during a
-    // transition makes iOS 15 show the bar when the animation starts.
+    // ${MARKER}: on iOS 15 an animated hide issued inside a push/pop
+    // is undone when the animation runs (a visible bar comes back, an already
+    // hidden one is shown). Only hide a visible bar, and not animated while a
+    // transition is in progress.
     if (!wasHidden) {
-      [navctr setNavigationBarHidden:YES animated:animated];
+      [navctr setNavigationBarHidden:YES animated:animated && navctr.transitionCoordinator == nil];
     }
     return;
   }`,
@@ -73,5 +80,5 @@ for (const nodeModulesRoot of nodeModulesRoots) {
 if (found === 0) {
     console.log('[patch] react-native-screens not installed, bar hide patch skipped');
 } else if (patched > 0) {
-    console.log(`[patch] Fixed react-native-screens redundant navigation bar hide (${patched} file(s))`);
+    console.log(`[patch] Fixed react-native-screens navigation bar hide in transitions (${patched} file(s))`);
 }

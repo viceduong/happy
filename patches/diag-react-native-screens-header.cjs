@@ -184,12 +184,12 @@ void HappyDiagScanBars(NSString *tag, UINavigationController *nav)
         // The fix patch's guarded hide.
         file: 'react-native-screens/ios/RNSScreenStackHeaderConfig.mm',
         find: `    if (!wasHidden) {
-      [navctr setNavigationBarHidden:YES animated:animated];
+      [navctr setNavigationBarHidden:YES animated:animated && navctr.transitionCoordinator == nil];
     }
     return;
   }`,
         replace: `    if (!wasHidden) {
-      [navctr setNavigationBarHidden:YES animated:animated];
+      [navctr setNavigationBarHidden:YES animated:animated && navctr.transitionCoordinator == nil];
     }
     // ${MARKER}
     HappyDiagLogEvent([NSString stringWithFormat:@"H %@ %@ a%d t%d w%d>h%d n%lu",
