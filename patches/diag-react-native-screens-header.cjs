@@ -1,13 +1,12 @@
 /**
  * TEMPORARY native diagnostics for slopus/happy#1890. Applied only when
  * HAPPY_HEADER_DIAG=1 (the sideload IPA workflow), after
- * fix-react-native-screens-header-before-props.cjs (whose fixes stay active).
+ * fix-react-native-screens-redundant-bar-hide.cjs.
  *
  * Logs the last 14 navigation-bar events, with a millisecond clock, to an
  * overlay label in the key window (navigation items are left untouched):
  *   S/H  react-native-screens shows/hides the bar (screen, caller wS/iN,
  *        a=animated, t=in transition, w=hidden before, h=hidden after)
- *   C    transition-completion re-hide from the fix patch
  *   V    scan of every UINavigationBar actually visible in the window:
  *        own/OTHER (the stack's bar or another one), y, alpha, top item
  *        title, superview class. Taken at viewWillAppear (wA), at the start
@@ -182,32 +181,16 @@ void HappyDiagScanBars(NSString *tag, UINavigationController *nav)
   // As the header might have change in \`updateViewController\``,
     },
     {
-        // The fix patch's transition-completion re-hide.
+        // The fix patch's guarded hide.
         file: 'react-native-screens/ios/RNSScreenStackHeaderConfig.mm',
-        find: `                                     if (!strongNav.navigationBarHidden) {
-                                       [strongNav setNavigationBarHidden:YES animated:NO];
-                                     }`,
-        replace: `                                     BOOL happyDiagWasHidden = strongNav.navigationBarHidden; // ${MARKER}
-                                     if (!strongNav.navigationBarHidden) {
-                                       [strongNav setNavigationBarHidden:YES animated:NO];
-                                     }
-                                     HappyDiagLogEvent([NSString stringWithFormat:@"C %@ w%d>h%d",
-                                                                                  HappyDiagShortTitle(strongConfig.title),
-                                                                                  (int)happyDiagWasHidden,
-                                                                                  (int)strongNav.navigationBarHidden]);`,
-    },
-    {
-        file: 'react-native-screens/ios/RNSScreenStackHeaderConfig.mm',
-        find: `    navitem.rightBarButtonItems = nil;
-
-    // Setting navigation bar visibility is split to mitigate iOS 26 bug with bar button items.
-    [navctr setNavigationBarHidden:YES animated:animated];
+        find: `    if (!wasHidden) {
+      [navctr setNavigationBarHidden:YES animated:animated];
+    }
     return;
   }`,
-        replace: `    navitem.rightBarButtonItems = nil;
-
-    // Setting navigation bar visibility is split to mitigate iOS 26 bug with bar button items.
-    [navctr setNavigationBarHidden:YES animated:animated];
+        replace: `    if (!wasHidden) {
+      [navctr setNavigationBarHidden:YES animated:animated];
+    }
     // ${MARKER}
     HappyDiagLogEvent([NSString stringWithFormat:@"H %@ %@ a%d t%d w%d>h%d n%lu",
                                                  HappyDiagShortTitle(config.title),
@@ -235,20 +218,6 @@ void HappyDiagScanBars(NSString *tag, UINavigationController *nav)
                                                (int)wasHidden,
                                                (int)navctr.navigationBarHidden,
                                                (int)(vc == navctr.topViewController)]);`,
-    },
-    {
-        // The fix patch's hide in the first animation frame.
-        file: 'react-native-screens/ios/RNSScreen.mm',
-        find: `          if (!wantsBar) {
-            [nav setNavigationBarHidden:YES animated:NO];
-          }`,
-        replace: `          if (!wantsBar) {
-            [nav setNavigationBarHidden:YES animated:NO];
-          }
-          HappyDiagLogEvent([NSString stringWithFormat:@"E %@ want%d >h%d", // ${MARKER}
-                                                       HappyDiagShortTitle(config.title),
-                                                       (int)wantsBar,
-                                                       (int)nav.navigationBarHidden]);`,
     },
     {
         file: 'react-native-screens/ios/RNSScreen.mm',
@@ -287,15 +256,16 @@ void HappyDiagScanBars(NSString *tag, UINavigationController *nav);`,
   }`,
     },
     {
-        // Before the fix patch's viewDidAppear re-apply, which stays active.
         file: 'react-native-screens/ios/RNSScreen.mm',
-        find: `  // happy: header-before-props: the screen on top owns the bar; re-apply its final config.`,
-        replace: `  // ${MARKER}
+        find: `  [super viewDidAppear:animated];
+  if (!_isSwiping || _shouldNotify) {`,
+        replace: `  [super viewDidAppear:animated];
+  // ${MARKER}
   if (self.navigationController != nil) {
     HappyDiagScanBars([NSString stringWithFormat:@"dA %@", HappyDiagShortTitle([self.screenView findHeaderConfig].title)],
                       self.navigationController);
   }
-  // happy: header-before-props: the screen on top owns the bar; re-apply its final config.`,
+  if (!_isSwiping || _shouldNotify) {`,
     },
 ];
 
