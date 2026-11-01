@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { ActivityIndicator, Platform, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Platform, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -21,12 +21,17 @@ export interface InlineQuestion {
 }
 
 export type InlineQuestionAnswers = Record<string, string[]>;
+/** The user's own typed answer per question id, beside the chosen option labels. */
+export type InlineQuestionCustomAnswers = Record<string, string>;
+
+/** Selection index of the "Other" (own answer) choice that ends every question. */
+const OTHER_INDEX = -1;
 
 interface InlineQuestionFormProps {
     questions: InlineQuestion[];
     canInteract: boolean;
     submittedAnswers?: InlineQuestionAnswers | null;
-    onSubmit: (answers: InlineQuestionAnswers) => Promise<void>;
+    onSubmit: (answers: InlineQuestionAnswers, customAnswers: InlineQuestionCustomAnswers) => Promise<void>;
     /** Declines the question without answering; the form then reads as answered with nothing. */
     onCancel?: () => Promise<void>;
 }
@@ -38,6 +43,7 @@ export const InlineQuestionForm = React.memo<InlineQuestionFormProps>((props) =>
     const { questions, onSubmit, onCancel } = props;
     const { theme } = useUnistyles();
     const [selections, setSelections] = React.useState<Map<string, Set<number>>>(new Map());
+    const [customTexts, setCustomTexts] = React.useState<Map<string, string>>(new Map());
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const [isCancelling, setIsCancelling] = React.useState(false);
     const [locallySubmittedAnswers, setLocallySubmittedAnswers] = React.useState<InlineQuestionAnswers | null>(null);
@@ -45,6 +51,7 @@ export const InlineQuestionForm = React.memo<InlineQuestionFormProps>((props) =>
 
     React.useEffect(() => {
         setSelections(new Map());
+        setCustomTexts(new Map());
         setLocallySubmittedAnswers(null);
         setIsSubmitting(false);
         setIsCancelling(false);
@@ -53,9 +60,16 @@ export const InlineQuestionForm = React.memo<InlineQuestionFormProps>((props) =>
     const submittedAnswers = props.submittedAnswers ?? locallySubmittedAnswers;
     const canInteract = props.canInteract && submittedAnswers === null;
     const allQuestionsAnswered = questions.every((question) => {
+        const selected = selections.get(question.id);
+        // A chosen "Other" needs the text it stands for.
+        if (selected?.has(OTHER_INDEX) && !customTexts.get(question.id)?.trim()) return false;
         if (question.required === false) return true;
-        return (selections.get(question.id)?.size ?? 0) > 0;
+        return (selected?.size ?? 0) > 0;
     });
+
+    const handleCustomTextChange = React.useCallback((questionId: string, text: string) => {
+        setCustomTexts(previous => new Map(previous).set(questionId, text));
+    }, []);
 
     const handleOptionToggle = React.useCallback((question: InlineQuestion, optionIndex: number) => {
         if (!canInteract) return;
@@ -82,25 +96,31 @@ export const InlineQuestionForm = React.memo<InlineQuestionFormProps>((props) =>
         if (!allQuestionsAnswered || isSubmitting) return;
 
         const answers: InlineQuestionAnswers = {};
+        const customAnswers: InlineQuestionCustomAnswers = {};
+        const shownAnswers: InlineQuestionAnswers = {};
         for (const question of questions) {
             const selected = selections.get(question.id);
             if (!selected || selected.size === 0) continue;
             answers[question.id] = Array.from(selected)
+                .filter(optionIndex => optionIndex !== OTHER_INDEX)
                 .map(optionIndex => question.options[optionIndex]?.label)
                 .filter((label): label is string => Boolean(label));
+            const custom = selected.has(OTHER_INDEX) ? customTexts.get(question.id)?.trim() : undefined;
+            if (custom) customAnswers[question.id] = custom;
+            shownAnswers[question.id] = custom ? [...answers[question.id], custom] : answers[question.id];
         }
 
         setIsSubmitting(true);
-        setLocallySubmittedAnswers(answers);
+        setLocallySubmittedAnswers(shownAnswers);
         try {
-            await onSubmit(answers);
+            await onSubmit(answers, customAnswers);
         } catch (error) {
             setLocallySubmittedAnswers(null);
             console.error('Failed to submit question answer:', error);
         } finally {
             setIsSubmitting(false);
         }
-    }, [allQuestionsAnswered, isSubmitting, onSubmit, questions, selections]);
+    }, [allQuestionsAnswered, customTexts, isSubmitting, onSubmit, questions, selections]);
 
     const handleCancel = React.useCallback(async () => {
         if (!onCancel || isSubmitting || isCancelling) return;
@@ -184,6 +204,48 @@ export const InlineQuestionForm = React.memo<InlineQuestionFormProps>((props) =>
                                         </TouchableOpacity>
                                     );
                                 })}
+                                <TouchableOpacity
+                                    style={[
+                                        styles.optionButton,
+                                        selectedOptions.has(OTHER_INDEX) && styles.optionButtonSelected,
+                                        !canInteract && styles.optionButtonDisabled,
+                                    ]}
+                                    onPress={() => handleOptionToggle(question, OTHER_INDEX)}
+                                    disabled={!canInteract}
+                                    activeOpacity={0.7}
+                                >
+                                    {question.multiSelect ? (
+                                        <View style={[
+                                            styles.checkboxOuter,
+                                            selectedOptions.has(OTHER_INDEX) && styles.checkboxOuterSelected,
+                                        ]}>
+                                            {selectedOptions.has(OTHER_INDEX) && <Ionicons name="checkmark" size={14} color="#fff" />}
+                                        </View>
+                                    ) : (
+                                        <View style={[
+                                            styles.radioOuter,
+                                            selectedOptions.has(OTHER_INDEX) && styles.radioOuterSelected,
+                                        ]}>
+                                            {selectedOptions.has(OTHER_INDEX) && <View style={styles.radioInner} />}
+                                        </View>
+                                    )}
+                                    <View style={styles.optionContent}>
+                                        <Text style={styles.optionLabel}>{t('tools.askUserQuestion.other')}</Text>
+                                        <Text style={styles.optionDescription}>{t('tools.askUserQuestion.otherDescription')}</Text>
+                                    </View>
+                                </TouchableOpacity>
+                                {selectedOptions.has(OTHER_INDEX) && (
+                                    <TextInput
+                                        style={styles.customInput}
+                                        value={customTexts.get(question.id) ?? ''}
+                                        onChangeText={(text) => handleCustomTextChange(question.id, text)}
+                                        placeholder={t('tools.askUserQuestion.otherPlaceholder')}
+                                        placeholderTextColor={theme.colors.input.placeholder}
+                                        editable={canInteract}
+                                        multiline
+                                        autoFocus
+                                    />
+                                )}
                             </View>
                         </View>
                     );
@@ -322,6 +384,19 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 13,
         color: theme.colors.textSecondary,
         marginTop: 2,
+    },
+    customInput: {
+        minHeight: 44,
+        maxHeight: 140,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+        backgroundColor: theme.colors.input.background,
+        color: theme.colors.input.text,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        fontSize: 15,
+        textAlignVertical: 'top',
     },
     actionsContainer: {
         flexDirection: 'row',

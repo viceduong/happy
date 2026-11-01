@@ -6,6 +6,7 @@ import {
     InlineQuestionForm,
     type InlineQuestion,
     type InlineQuestionAnswers,
+    type InlineQuestionCustomAnswers,
 } from './InlineQuestionForm';
 
 interface AskUserQuestionInput {
@@ -27,15 +28,16 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(({ tool, sessionId 
         }))
     ), [input?.questions]);
 
-    const handleSubmit = React.useCallback(async (answers: InlineQuestionAnswers) => {
+    const handleSubmit = React.useCallback(async (answers: InlineQuestionAnswers, customAnswers: InlineQuestionCustomAnswers) => {
         if (!sessionId || !tool.permission?.id) return;
 
         const providerAnswers: Record<string, string> = {};
         questions.forEach((question, index) => {
             const originalQuestion = input?.questions?.[index];
-            const selected = answers[question.id];
-            if (originalQuestion && selected?.length) {
-                providerAnswers[originalQuestion.question] = selected.join(', ');
+            // The user's own answer reads as one more chosen value.
+            const values = [...(answers[question.id] ?? []), ...(customAnswers[question.id] ? [customAnswers[question.id]] : [])];
+            if (originalQuestion && values.length) {
+                providerAnswers[originalQuestion.question] = values.join(', ');
             }
         });
 

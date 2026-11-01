@@ -7,6 +7,7 @@ import { ToolViewProps } from './_all';
 import {
     InlineQuestionForm,
     type InlineQuestionAnswers,
+    type InlineQuestionCustomAnswers,
 } from './InlineQuestionForm';
 
 /** Inline renderer for Happy/Codex request_user_input communications. */
@@ -25,17 +26,19 @@ export const RequestUserInputView = React.memo<ToolViewProps>(({ tool, sessionId
         return answers;
     }, [communication]);
 
-    const handleSubmit = React.useCallback(async (answers: InlineQuestionAnswers) => {
+    const handleSubmit = React.useCallback(async (answers: InlineQuestionAnswers, customAnswers: InlineQuestionCustomAnswers) => {
         if (!sessionId || !communication || communication.status !== 'pending') return;
 
         const communicationAnswers: Record<string, AgentQuestionAnswer> = {};
         for (const question of communication.questions) {
-            const selected = answers[question.id];
-            if (!selected?.length) continue;
+            const selected = answers[question.id] ?? [];
+            const custom = customAnswers[question.id];
+            if (!selected.length && !custom) continue;
             communicationAnswers[question.id] = {
                 options: question.multiSelect
                     ? selected
                     : selected.slice(0, 1),
+                ...(custom ? { custom } : {}),
             };
         }
         await sessionAnswerQuestion(sessionId, communication.id, communicationAnswers, communication.kind);
