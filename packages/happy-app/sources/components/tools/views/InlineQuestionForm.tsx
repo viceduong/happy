@@ -24,9 +24,6 @@ export type InlineQuestionAnswers = Record<string, string[]>;
 /** The user's own typed answer per question id, beside the chosen option labels. */
 export type InlineQuestionCustomAnswers = Record<string, string>;
 
-/** Selection index of the "Other" (own answer) choice that ends every question. */
-const OTHER_INDEX = -1;
-
 interface InlineQuestionFormProps {
     questions: InlineQuestion[];
     canInteract: boolean;
@@ -60,11 +57,9 @@ export const InlineQuestionForm = React.memo<InlineQuestionFormProps>((props) =>
     const submittedAnswers = props.submittedAnswers ?? locallySubmittedAnswers;
     const canInteract = props.canInteract && submittedAnswers === null;
     const allQuestionsAnswered = questions.every((question) => {
-        const selected = selections.get(question.id);
-        // A chosen "Other" needs the text it stands for.
-        if (selected?.has(OTHER_INDEX) && !customTexts.get(question.id)?.trim()) return false;
         if (question.required === false) return true;
-        return (selected?.size ?? 0) > 0;
+        // An option or the user's own typed answer both answer the question.
+        return (selections.get(question.id)?.size ?? 0) > 0 || !!customTexts.get(question.id)?.trim();
     });
 
     const handleCustomTextChange = React.useCallback((questionId: string, text: string) => {
@@ -100,12 +95,11 @@ export const InlineQuestionForm = React.memo<InlineQuestionFormProps>((props) =>
         const shownAnswers: InlineQuestionAnswers = {};
         for (const question of questions) {
             const selected = selections.get(question.id);
-            if (!selected || selected.size === 0) continue;
-            answers[question.id] = Array.from(selected)
-                .filter(optionIndex => optionIndex !== OTHER_INDEX)
+            const custom = customTexts.get(question.id)?.trim();
+            if ((!selected || selected.size === 0) && !custom) continue;
+            answers[question.id] = Array.from(selected ?? [])
                 .map(optionIndex => question.options[optionIndex]?.label)
                 .filter((label): label is string => Boolean(label));
-            const custom = selected.has(OTHER_INDEX) ? customTexts.get(question.id)?.trim() : undefined;
             if (custom) customAnswers[question.id] = custom;
             shownAnswers[question.id] = custom ? [...answers[question.id], custom] : answers[question.id];
         }
@@ -204,46 +198,15 @@ export const InlineQuestionForm = React.memo<InlineQuestionFormProps>((props) =>
                                         </TouchableOpacity>
                                     );
                                 })}
-                                <TouchableOpacity
-                                    style={[
-                                        styles.optionButton,
-                                        selectedOptions.has(OTHER_INDEX) && styles.optionButtonSelected,
-                                        !canInteract && styles.optionButtonDisabled,
-                                    ]}
-                                    onPress={() => handleOptionToggle(question, OTHER_INDEX)}
-                                    disabled={!canInteract}
-                                    activeOpacity={0.7}
-                                >
-                                    {question.multiSelect ? (
-                                        <View style={[
-                                            styles.checkboxOuter,
-                                            selectedOptions.has(OTHER_INDEX) && styles.checkboxOuterSelected,
-                                        ]}>
-                                            {selectedOptions.has(OTHER_INDEX) && <Ionicons name="checkmark" size={14} color="#fff" />}
-                                        </View>
-                                    ) : (
-                                        <View style={[
-                                            styles.radioOuter,
-                                            selectedOptions.has(OTHER_INDEX) && styles.radioOuterSelected,
-                                        ]}>
-                                            {selectedOptions.has(OTHER_INDEX) && <View style={styles.radioInner} />}
-                                        </View>
-                                    )}
-                                    <View style={styles.optionContent}>
-                                        <Text style={styles.optionLabel}>{t('tools.askUserQuestion.other')}</Text>
-                                        <Text style={styles.optionDescription}>{t('tools.askUserQuestion.otherDescription')}</Text>
-                                    </View>
-                                </TouchableOpacity>
-                                {selectedOptions.has(OTHER_INDEX) && (
+                                {canInteract && (
                                     <TextInput
                                         style={styles.customInput}
                                         value={customTexts.get(question.id) ?? ''}
                                         onChangeText={(text) => handleCustomTextChange(question.id, text)}
                                         placeholder={t('tools.askUserQuestion.otherPlaceholder')}
                                         placeholderTextColor={theme.colors.input.placeholder}
-                                        editable={canInteract}
+                                        accessibilityLabel={t('tools.askUserQuestion.otherDescription')}
                                         multiline
-                                        autoFocus
                                     />
                                 )}
                             </View>
