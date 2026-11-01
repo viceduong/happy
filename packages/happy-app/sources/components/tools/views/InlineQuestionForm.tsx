@@ -27,16 +27,19 @@ interface InlineQuestionFormProps {
     canInteract: boolean;
     submittedAnswers?: InlineQuestionAnswers | null;
     onSubmit: (answers: InlineQuestionAnswers) => Promise<void>;
+    /** Declines the question without answering; the form then reads as answered with nothing. */
+    onCancel?: () => Promise<void>;
 }
 
 // This is the shared choice form used by both Claude's AskUserQuestion tool and
 // agent communications such as Codex/Happy request_user_input. Transport and
 // answer payload differences stay in the small wrappers around this view.
 export const InlineQuestionForm = React.memo<InlineQuestionFormProps>((props) => {
-    const { questions, onSubmit } = props;
+    const { questions, onSubmit, onCancel } = props;
     const { theme } = useUnistyles();
     const [selections, setSelections] = React.useState<Map<string, Set<number>>>(new Map());
     const [isSubmitting, setIsSubmitting] = React.useState(false);
+    const [isCancelling, setIsCancelling] = React.useState(false);
     const [locallySubmittedAnswers, setLocallySubmittedAnswers] = React.useState<InlineQuestionAnswers | null>(null);
     const questionKey = questions.map(question => question.id).join('\u0000');
 
@@ -44,6 +47,7 @@ export const InlineQuestionForm = React.memo<InlineQuestionFormProps>((props) =>
         setSelections(new Map());
         setLocallySubmittedAnswers(null);
         setIsSubmitting(false);
+        setIsCancelling(false);
     }, [questionKey]);
 
     const submittedAnswers = props.submittedAnswers ?? locallySubmittedAnswers;
@@ -97,6 +101,21 @@ export const InlineQuestionForm = React.memo<InlineQuestionFormProps>((props) =>
             setIsSubmitting(false);
         }
     }, [allQuestionsAnswered, isSubmitting, onSubmit, questions, selections]);
+
+    const handleCancel = React.useCallback(async () => {
+        if (!onCancel || isSubmitting || isCancelling) return;
+
+        setIsCancelling(true);
+        setLocallySubmittedAnswers({});
+        try {
+            await onCancel();
+        } catch (error) {
+            setLocallySubmittedAnswers(null);
+            console.error('Failed to cancel question:', error);
+        } finally {
+            setIsCancelling(false);
+        }
+    }, [isCancelling, isSubmitting, onCancel]);
 
     if (submittedAnswers) {
         return (
@@ -172,6 +191,16 @@ export const InlineQuestionForm = React.memo<InlineQuestionFormProps>((props) =>
 
                 {canInteract && (
                     <View style={styles.actionsContainer}>
+                        {onCancel && (
+                            <TouchableOpacity
+                                style={[styles.cancelButton, isSubmitting && styles.submitButtonDisabled]}
+                                onPress={handleCancel}
+                                disabled={isSubmitting || isCancelling}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
+                            </TouchableOpacity>
+                        )}
                         <TouchableOpacity
                             style={[
                                 styles.submitButton,
@@ -315,6 +344,21 @@ const styles = StyleSheet.create((theme) => ({
     },
     submitButtonDisabled: {
         opacity: 0.5,
+    },
+    cancelButton: {
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 44,
+    },
+    cancelButtonText: {
+        color: theme.colors.textSecondary,
+        fontSize: 14,
+        fontWeight: '600',
     },
     submitButtonReady: {
         borderColor: theme.colors.radio.active,

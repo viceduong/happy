@@ -1,6 +1,6 @@
 import * as React from 'react';
 
-import { sessionAnswerQuestion } from '@/sync/ops';
+import { sessionAnswerQuestion, sessionCancelCommunication } from '@/sync/ops';
 import { useSessionAgentFormCommunication } from '@/sync/storage';
 import type { AgentQuestionAnswer } from '@/sync/storageTypes';
 import { ToolViewProps } from './_all';
@@ -41,6 +41,11 @@ export const RequestUserInputView = React.memo<ToolViewProps>(({ tool, sessionId
         await sessionAnswerQuestion(sessionId, communication.id, communicationAnswers, communication.kind);
     }, [communication, sessionId]);
 
+    const handleCancel = React.useCallback(async () => {
+        if (!sessionId || !communication || communication.status !== 'pending') return;
+        await sessionCancelCommunication(sessionId, communication.id, communication.kind);
+    }, [communication, sessionId]);
+
     if (!communication || communication.questions.some(question => question.options.length === 0)) {
         return null;
     }
@@ -51,6 +56,7 @@ export const RequestUserInputView = React.memo<ToolViewProps>(({ tool, sessionId
             canInteract={tool.state === 'running' && communication.status === 'pending'}
             submittedAnswers={submittedAnswers}
             onSubmit={handleSubmit}
+            onCancel={handleCancel}
         />
     );
 });

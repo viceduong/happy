@@ -1,6 +1,6 @@
 import * as React from 'react';
 
-import { sessionAllow } from '@/sync/ops';
+import { sessionAllow, sessionDeny } from '@/sync/ops';
 import { ToolViewProps } from './_all';
 import {
     InlineQuestionForm,
@@ -51,14 +51,24 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(({ tool, sessionId 
         );
     }, [input?.questions, questions, sessionId, tool.permission?.id]);
 
+    // A declined question is an ordinary denied permission: Claude gets the
+    // CLI's rejection, stops, and waits for the user's next message.
+    const handleCancel = React.useCallback(async () => {
+        if (!sessionId || !tool.permission?.id) return;
+        await sessionDeny(sessionId, tool.permission.id);
+    }, [sessionId, tool.permission?.id]);
+
     if (questions.length === 0) return null;
+
+    const declined = tool.permission?.status === 'denied' || tool.permission?.status === 'canceled';
 
     return (
         <InlineQuestionForm
             questions={questions}
             canInteract={tool.state === 'running'}
-            submittedAnswers={tool.state === 'completed' ? {} : undefined}
+            submittedAnswers={tool.state === 'completed' || declined ? {} : undefined}
             onSubmit={handleSubmit}
+            onCancel={handleCancel}
         />
     );
 });
