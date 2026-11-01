@@ -41,6 +41,7 @@ import { t } from '@/text';
 import type { Project } from './projectTypes';
 import { getSessionProjectId, isHappyAgentSession } from './projectTypes';
 import { resolveSessionAvatar } from './resolveSessionAvatar';
+import { findSupersededSessionIds } from './supersededSessions';
 
 // Debounce timer for realtimeMode changes
 let realtimeModeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -401,11 +402,16 @@ function buildSessionListViewData(
     const rigPathSessions: Session[] = [];
     const happySessions: Session[] = [];
     const archivedSessions: Session[] = [];
+    // Older copies of a resumed conversation; only its latest session is listed.
+    const supersededSessionIds = findSupersededSessionIds(Object.values(sessions));
 
     Object.values(sessions).forEach(session => {
         // Side chats are hidden children of another session — they render only
         // inside the parent's sidebar panel, never in the top-level list.
         if (session.metadata?.isSideChat) {
+            return;
+        }
+        if (supersededSessionIds.has(session.id)) {
             return;
         }
         // The archive is a flat chronological tail, not part of any project.
