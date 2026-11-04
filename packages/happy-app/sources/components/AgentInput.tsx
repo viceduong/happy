@@ -675,7 +675,11 @@ function ContextGaugeIcon(props: { percent: number }) {
 
 type UsageRowProps = {
     contextStatus: { percent: number; detailText: string; color: string } | null;
+    /** Five-hour session window, already turned into remaining or used. */
+    sessionPercent: number | null;
     weekPercent: number | null;
+    /** Whether the percentages count down (remaining) or up (used). */
+    showRemaining: boolean;
     /** Prebuilt "Session — 32% · resets 6 PM" rows for the week popup. */
     usageMenuOptions: NativeSettingsMenuOption[];
 };
@@ -686,12 +690,22 @@ type UsageRowProps = {
 const AgentInputUsageRow = React.memo(function AgentInputUsageRow(p: UsageRowProps) {
     const { theme } = useUnistyles();
     const [showPreciseContext, setShowPreciseContext] = React.useState(false);
-    if (!p.contextStatus && p.weekPercent == null) {
+    if (!p.contextStatus && p.weekPercent == null && p.sessionPercent == null) {
         return null;
     }
-    const weekText = p.weekPercent != null ? (
+    const quota = (percent: number) => p.showRemaining
+        ? t('agentInput.context.quotaLeft', { percent: Math.round(percent) })
+        : t('agentInput.context.quotaUsed', { percent: Math.round(percent) });
+    const quotaParts: string[] = [];
+    if (p.sessionPercent != null) {
+        quotaParts.push(`${t('agentInput.context.sessionWindow')} ${quota(p.sessionPercent)}`);
+    }
+    if (p.weekPercent != null) {
+        quotaParts.push(`${t('agentInput.context.weekWindow')} ${quota(p.weekPercent)}`);
+    }
+    const weekText = quotaParts.length > 0 ? (
         <Text style={{ fontSize: 11, color: theme.colors.textSecondary, ...Typography.default() }}>
-            {t('agentInput.context.percentWeek', { percent: Math.round(p.weekPercent) })}
+            {quotaParts.join(' · ')}
         </Text>
     ) : null;
     return (
@@ -921,7 +935,11 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
         const week = rows.find((row) => row.id === 'seven_day') ?? null;
         return { session, week };
     }, [props.sessionStatusUsageLimits]);
-    const weekPercent = usageRows.week?.utilization != null && (props.alwaysShowContextSize || contextStatus != null)
+    // Both plan windows are always shown once the agent reports them.
+    const sessionPercent = usageRows.session?.utilization != null
+        ? getUsageLimitDisplayPercentage(usageRows.session.utilization, usageLimitShowRemaining)
+        : null;
+    const weekPercent = usageRows.week?.utilization != null
         ? getUsageLimitDisplayPercentage(usageRows.week.utilization, usageLimitShowRemaining)
         : null;
     const usageMenuOptions = React.useMemo<NativeSettingsMenuOption[]>(() => {
@@ -2250,7 +2268,9 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                 <AnimatedFade visible={props.showStatusDetails !== false}>
                     <AgentInputUsageRow
                         contextStatus={contextStatus}
+                        sessionPercent={sessionPercent}
                         weekPercent={weekPercent}
+                        showRemaining={usageLimitShowRemaining}
                         usageMenuOptions={usageMenuOptions}
                     />
                 </AnimatedFade>

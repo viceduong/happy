@@ -523,6 +523,10 @@ export const ja: TranslationStructure = {
             detailContext: ({ used, total }: { used: string; total: string }) => `コンテキスト ${used} / ${total}`,
             percentContext: ({ percent }: { percent: number }) => `コンテキスト ${percent}%`,
             percentWeek: ({ percent }: { percent: number }) => `週 ${percent}%`,
+            sessionWindow: '5時間',
+            weekWindow: '週',
+            quotaLeft: ({ percent }: { percent: number }) => `残り${percent}%`,
+            quotaUsed: ({ percent }: { percent: number }) => `${percent}%使用`,
         },
         usagePopup: {
             session: 'セッション',

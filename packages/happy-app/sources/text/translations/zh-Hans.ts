@@ -523,6 +523,10 @@ export const zhHans: TranslationStructure = {
             detailContext: ({ used, total }: { used: string; total: string }) => `上下文 ${used} / ${total}`,
             percentContext: ({ percent }: { percent: number }) => `上下文 ${percent}%`,
             percentWeek: ({ percent }: { percent: number }) => `本周 ${percent}%`,
+            sessionWindow: '5小时',
+            weekWindow: '本周',
+            quotaLeft: ({ percent }: { percent: number }) => `剩余 ${percent}%`,
+            quotaUsed: ({ percent }: { percent: number }) => `已用 ${percent}%`,
         },
         usagePopup: {
             session: '会话',

@@ -197,7 +197,7 @@ describe('settings', () => {
                 showFlavorIcons: false,
                 showHarnessIconInSessionHeader: true,
                 userMessageBubbleColor: 'gray',
-                usageLimitShowRemaining: false,
+                usageLimitShowRemaining: true,
                 hideInactiveSessions: true,
                 sortSessionsByActivity: true,
                 expResumeSession: true,

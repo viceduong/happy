@@ -522,6 +522,10 @@ export const ca: TranslationStructure = {
             detailContext: ({ used, total }: { used: string; total: string }) => `${used} / ${total} de context`,
             percentContext: ({ percent }: { percent: number }) => `${percent}% context`,
             percentWeek: ({ percent }: { percent: number }) => `${percent}% setmana`,
+            sessionWindow: '5h',
+            weekWindow: 'setmana',
+            quotaLeft: ({ percent }: { percent: number }) => `${percent}% restant`,
+            quotaUsed: ({ percent }: { percent: number }) => `${percent}% usat`,
         },
         usagePopup: {
             session: 'Sessió',
