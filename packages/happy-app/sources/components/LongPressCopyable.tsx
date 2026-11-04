@@ -13,6 +13,8 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import { useRouter } from 'expo-router';
+import { storeTempText } from '@/sync/persistence';
 import { Typography } from '@/constants/Typography';
 import { t } from '@/text';
 import { hapticsLight } from './haptics';
@@ -25,8 +27,9 @@ type AnchorRect = {
     y: number;
 };
 
-const MENU_WIDTH = 152;
-const MENU_HEIGHT = 44;
+const MENU_WIDTH = 210;
+const MENU_ITEM_HEIGHT = 44;
+const MENU_HEIGHT = MENU_ITEM_HEIGHT * 2;
 const MENU_GAP = 8;
 const SCREEN_MARGIN = 12;
 
@@ -88,6 +91,7 @@ function CopyMenu({ anchor, onClose, text }: {
     text: string;
 }) {
     const { theme } = useUnistyles();
+    const router = useRouter();
     const { height: windowHeight, width: windowWidth } = useWindowDimensions();
 
     const handleCopy = React.useCallback(async () => {
@@ -98,6 +102,16 @@ function CopyMenu({ anchor, onClose, text }: {
             console.error('Failed to copy message:', error);
         }
     }, [onClose, text]);
+
+    // Opens the full-screen text view, where any part of the message can be selected.
+    const handleSelect = React.useCallback(() => {
+        onClose();
+        try {
+            router.push(`/text-selection?textId=${storeTempText(text)}`);
+        } catch (error) {
+            console.error('Failed to open text selection:', error);
+        }
+    }, [onClose, router, text]);
 
     // Prefer sitting above the message; drop below when the message is close to
     // the top of the screen.
@@ -130,6 +144,15 @@ function CopyMenu({ anchor, onClose, text }: {
                         <Ionicons color={theme.colors.text} name="copy-outline" size={17} />
                         <Text style={styles.menuItemLabel}>{t('common.copy')}</Text>
                     </Pressable>
+                    <Pressable
+                        accessibilityLabel={t('textSelection.selectText')}
+                        accessibilityRole="button"
+                        onPress={handleSelect}
+                        style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
+                    >
+                        <Ionicons color={theme.colors.text} name="text-outline" size={17} />
+                        <Text style={styles.menuItemLabel}>{t('textSelection.selectText')}</Text>
+                    </Pressable>
                 </AnimatedPopup>
             </View>
         </RNModal>
@@ -161,7 +184,7 @@ const styles = StyleSheet.create((theme) => ({
         elevation: 8,
     },
     menuItem: {
-        height: MENU_HEIGHT,
+        height: MENU_ITEM_HEIGHT,
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 14,

@@ -24,7 +24,6 @@ export default function DevScreen() {
     const [verboseLogging, setVerboseLogging] = useLocalSettingMutable('verboseLogging');
     const [consoleLoggingEnabled, setConsoleLoggingEnabled] = useLocalSettingMutable('consoleLoggingEnabled');
     const [experiments, setExperiments] = useSettingMutable('experiments');
-    const [markdownCopyV2, setMarkdownCopyV2] = useLocalSettingMutable('markdownCopyV2');
     const socketStatus = useSocketStatus();
     const anonymousId = sync.encryption!.anonID;
     const { theme } = useUnistyles();
@@ -235,18 +234,6 @@ export default function DevScreen() {
                         <Switch
                             value={experiments}
                             onValueChange={setExperiments}
-                        />
-                    }
-                    showChevron={false}
-                />
-                <Item
-                    title={t('settingsFeatures.markdownCopyV2')}
-                    subtitle={t('settingsFeatures.markdownCopyV2Subtitle')}
-                    icon={<Ionicons name="text-outline" size={28} color="#34C759" />}
-                    rightElement={
-                        <Switch
-                            value={markdownCopyV2}
-                            onValueChange={setMarkdownCopyV2}
                         />
                     }
                     showChevron={false}

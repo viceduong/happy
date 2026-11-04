@@ -8,7 +8,6 @@ import { Text } from '../StyledText';
 import { Typography } from '@/constants/Typography';
 import { SimpleSyntaxHighlighter } from '../SimpleSyntaxHighlighter';
 import { Modal } from '@/modal';
-import { useLocalSetting } from '@/sync/storage';
 import { storeTempText } from '@/sync/persistence';
 import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
@@ -37,12 +36,11 @@ export const MarkdownView = React.memo((props: {
     const blocks = React.useMemo(() => parseMarkdown(props.markdown), [props.markdown]);
     
     // Backwards compatibility: The original version just returned the view, wrapping the list of blocks.
-    // It made each of the individual text elements selectable. When we enable the markdownCopyV2 feature,
-    // we disable the selectable property on individual text segments on mobile only. Instead, the long press
-    // will be handled by a wrapper Pressable. If we don't disable the selectable property, then you will see
-    // the native copy modal come up at the same time as the long press handler is fired.
-    const markdownCopyV2 = useLocalSetting('markdownCopyV2');
-    const selectable = Platform.OS === 'web' || !(markdownCopyV2 || props.externalCopyHandler);
+    // Native Text selection only offers whole-paragraph copy, so on mobile a long
+    // press opens the text-selection screen instead, where any part of the
+    // message can be selected. Segments are not selectable there, otherwise the
+    // native callout would open together with the long press.
+    const selectable = Platform.OS === 'web';
     const router = useRouter();
 
     const handleLinkPress = React.useCallback((url: string) => {
@@ -94,7 +92,7 @@ export const MarkdownView = React.memo((props: {
         );
     }
 
-    if (props.externalCopyHandler || !markdownCopyV2) {
+    if (props.externalCopyHandler) {
         return renderContent();
     }
     
