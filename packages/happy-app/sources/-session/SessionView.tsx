@@ -79,6 +79,7 @@ import {
 } from '@/sync/rig';
 import { RigActivityBar } from '@/components/RigActivityBar';
 import { AnimatedFade } from '@/components/AnimatedOverlay';
+import { useFreshestUsageLimits } from '@/hooks/useFreshestUsageLimits';
 
 export const SessionView = React.memo((props: { id: string }) => {
     const routeId = props.id;
@@ -772,6 +773,8 @@ export function SessionViewLoaded({
     onHeaderBackdropVisibilityChange?: (visible: boolean) => void;
 }) {
     const { theme } = useUnistyles();
+    // Account-wide plan limits: the freshest snapshot on this machine, not just this session's.
+    const usageLimits = useFreshestUsageLimits(session);
     const router = useRouter();
     const safeArea = useSafeAreaInsets();
     const isLandscape = useIsLandscape();
@@ -1207,7 +1210,7 @@ export function SessionViewLoaded({
                 alwaysShowContextSize={alwaysShowContextSize}
                 zenMode={zenMode}
                 showStatusDetails={showBottomDockDetails}
-                sessionStatusUsageLimits={session?.agentState?.usageLimits ?? null}
+                sessionStatusUsageLimits={usageLimits}
                 onActionAreaOffsetChange={usesFloatingMobileDock ? handleComposerCardOffsetChange : undefined}
             />
         </View>
