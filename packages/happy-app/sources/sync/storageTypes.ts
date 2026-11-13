@@ -152,6 +152,8 @@ export const MetadataSchema = z.object({
         text: z.string(),
         updatedAt: z.number()
     }).optional(),
+    /** A name the user gave the session; shown instead of the agent's summary. */
+    customTitle: z.string().optional(),
     /**
      * When the session last did something a person would call activity: the
      * newest visible user message, visible agent text, or user-facing question.

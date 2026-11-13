@@ -2,7 +2,7 @@ import * as React from 'react';
 import { useHappyAction } from '@/hooks/useHappyAction';
 import { useNavigateToSession } from '@/hooks/useNavigateToSession';
 import { Modal } from '@/modal';
-import { machineResumeSession, sessionArchive, sessionKill, sessionSetAgentModes, forkAndSpawn, type ForkSource } from '@/sync/ops';
+import { machineResumeSession, sessionArchive, sessionKill, sessionRename, sessionSetAgentModes, forkAndSpawn, type ForkSource } from '@/sync/ops';
 import { maybeCleanupWorktree } from '@/hooks/useWorktreeCleanup';
 import { storage, useLocalSetting, useMachine, useSetting } from '@/sync/storage';
 import { Machine, Session } from '@/sync/storageTypes';
@@ -11,7 +11,7 @@ import { resolveMessageModeMeta, UnsupportedPermissionModeError } from '@/sync/m
 import { t } from '@/text';
 import { HappyError } from '@/utils/errors';
 import { copySessionMetadataToClipboard, copySessionMetadataAndLogsToClipboard } from '@/utils/copySessionMetadataToClipboard';
-import { useSessionStatus } from '@/utils/sessionUtils';
+import { getSessionName, useSessionStatus } from '@/utils/sessionUtils';
 import { isMachineOnline } from '@/utils/machineUtils';
 import { getSessionForkSource } from '@/utils/sessionFork';
 import { useRouter } from 'expo-router';
@@ -181,6 +181,22 @@ export function useSessionQuickActions(
         router.push(`/session/${session.id}/info`);
     }, [router, session.id]);
 
+    // Empty input clears the custom name, so the agent's summary shows again.
+    const [renamingSession, performRename] = useHappyAction(async () => {
+        const name = await Modal.prompt(t('session.renameTitle'), t('session.renameMessage'), {
+            defaultValue: session.metadata?.customTitle ?? getSessionName(session),
+            confirmText: t('common.save'),
+            cancelText: t('common.cancel'),
+        });
+        if (name === null) return;
+        try {
+            await sessionRename(session.id, name);
+        } catch (error) {
+            console.error(`Failed to rename session ${session.id}`, error);
+            throw new HappyError(t('session.renameFailed'), false);
+        }
+    });
+
     const copySessionMetadata = React.useCallback(() => {
         void (async () => {
             const copied = await copySessionMetadataToClipboard(session);
@@ -334,6 +350,7 @@ export function useSessionQuickActions(
     const actionItems = React.useMemo<SessionActionItem[]>(() => {
         const items: SessionActionItem[] = [
             { id: 'details', icon: 'information-circle-outline', label: t('profile.details'), onPress: openDetails },
+            { id: 'rename', icon: 'pencil-outline', label: t('session.renameAction'), onPress: performRename },
         ];
 
         if (resumeAvailability.canShowResume) {
@@ -363,6 +380,7 @@ export function useSessionQuickActions(
         forkSession,
         openDetails,
         openDuplicateSheet,
+        performRename,
         resumeAvailability.canShowResume,
         resumeSession,
     ]);
@@ -393,6 +411,8 @@ export function useSessionQuickActions(
         forking,
         openDetails,
         openDuplicateSheet,
+        renameSession: performRename,
+        renamingSession,
         resumeSession,
         resumeSessionSubtitle: resumeAvailability.subtitle,
         resumingSession,

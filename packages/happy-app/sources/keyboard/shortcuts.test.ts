@@ -113,6 +113,7 @@ describe('session action shortcuts', () => {
     it('defines a shortcut for every session action', () => {
         expect(Object.keys(SESSION_ACTION_SHORTCUTS)).toEqual([
             'details',
+            'rename',
             'resume',
             'fork',
             'duplicate',

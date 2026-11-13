@@ -96,6 +96,7 @@ export function useSessionStatus(session: Session): SessionStatus {
  */
 export function getSessionName(session: Session): string {
     if (session.metadata?.bot) return session.metadata.bot.name;
+    if (session.metadata?.customTitle?.trim()) return session.metadata.customTitle.trim();
     if (session.metadata?.summary) {
         return session.metadata.summary.text;
     }

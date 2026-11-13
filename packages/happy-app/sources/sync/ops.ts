@@ -757,6 +757,55 @@ export async function machineUpdateMetadata(
 }
 
 /**
+ * Give a session a name of the user's choosing, or clear it (empty / null) to
+ * fall back to the agent's summary. The name lives in synced metadata as
+ * `customTitle`; the CLI writes metadata as a spread of the latest copy, so its
+ * own summary updates keep the name. The server echoes the update to this
+ * device, which is what refreshes the list.
+ */
+export async function sessionRename(sessionId: string, title: string | null, maxRetries: number = 3): Promise<void> {
+    const encryption = sync.encryption.getSessionEncryption(sessionId);
+    const session = storage.getState().sessions[sessionId];
+    if (!encryption || !session?.metadata) {
+        throw new Error(`Session ${sessionId} is not ready for metadata updates`);
+    }
+
+    const customTitle = title?.trim() || undefined;
+    const withTitle = (metadata: Record<string, unknown>) => {
+        const { customTitle: _previous, ...rest } = metadata;
+        return customTitle ? { ...rest, customTitle } : rest;
+    };
+
+    let currentVersion = session.metadataVersion;
+    let currentMetadata = withTitle({ ...session.metadata });
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const result = await apiSocket.emitWithAck<{
+            result: 'success' | 'version-mismatch' | 'error';
+            version?: number;
+            metadata?: string;
+        }>('update-metadata', {
+            sid: sessionId,
+            metadata: await encryption.encryptRaw(currentMetadata),
+            expectedVersion: currentVersion
+        });
+        if (result.result === 'success') {
+            return;
+        }
+        if (result.result === 'version-mismatch') {
+            const latest = await encryption.decryptRaw(result.metadata!);
+            if (!latest) {
+                throw new Error('Failed to decrypt latest session metadata');
+            }
+            currentVersion = result.version!;
+            currentMetadata = withTitle(latest);
+            continue;
+        }
+        throw new Error('Failed to update session metadata');
+    }
+    throw new Error(`Failed to rename session after ${maxRetries} retries due to version conflicts`);
+}
+
+/**
  * Persist per-session mode picks into synced session metadata with optimistic
  * concurrency and automatic retry. On version conflict the latest metadata is
  * taken from the server via the schema-free raw decrypt, so fields this app

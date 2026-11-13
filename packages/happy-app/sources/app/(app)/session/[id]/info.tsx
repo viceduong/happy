@@ -99,6 +99,8 @@ function SessionInfoContent({ session }: { session: Session }) {
         forking,
         forkSession,
         openDuplicateSheet,
+        renameSession,
+        renamingSession,
         resumeSession,
         resumeSessionSubtitle,
     } = useSessionQuickActions(session);
@@ -240,6 +242,13 @@ function SessionInfoContent({ session }: { session: Session }) {
                             </View>
                         ) : undefined}
                         onPress={() => router.push(`/session/${session.id}/changes`)}
+                    />
+                    <Item
+                        title={t('session.renameAction')}
+                        subtitle={getSessionName(session)}
+                        icon={<Ionicons name="pencil-outline" size={29} color="#007AFF" />}
+                        onPress={renameSession}
+                        loading={renamingSession}
                     />
                     {session.metadata?.machineId && (
                         <Item
