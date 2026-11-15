@@ -20,6 +20,8 @@ import { getAskUserQuestionToolCallIds } from "./utils/questionNotification";
 import { launchFailureMessage } from "./utils/launchFailureMessage";
 import { cleanupStdinAfterInk } from "@/utils/terminalStdinCleanup";
 import type { MessageParam, ContentBlockParam } from '@anthropic-ai/sdk/resources';
+import type { RewindFilesResult } from '@anthropic-ai/claude-agent-sdk';
+import { findRewindPoint } from "./utils/rewindPoint";
 
 interface PermissionsField {
     date: number;
@@ -97,9 +99,64 @@ export async function claudeRemoteLauncher(session: Session): Promise<'switch' |
         await abort();
     }
 
+    // The live query, while one exists: a rewind restores files through it.
+    let liveQuery: { rewindFiles: (userMessageId: string) => Promise<RewindFilesResult> } | null = null;
+    // A rewind stops the turn on purpose; it is not reported as "Aborted by user".
+    let rewinding = false;
+
+    /**
+     * "Rewind to here" from the app: drop the named user message and
+     * everything after it. Optionally restore the files Claude changed since
+     * then, stop the current turn, and resume the conversation just before the
+     * message on the next one. The dropped messages stay on the server; the
+     * time range recorded in metadata tells the app to hide them.
+     */
+    async function doRewind(params: { claudeUuid?: string, text?: string, fromAt: number, undoFiles?: boolean }) {
+        logger.debug('[remote]: doRewind', { claudeUuid: params.claudeUuid, undoFiles: params.undoFiles });
+        if (!session.sessionId) {
+            return { ok: false, error: 'There is no Claude conversation to rewind yet.' };
+        }
+        const point = await findRewindPoint({
+            workingDirectory: session.path,
+            claudeSessionId: session.sessionId,
+            claudeUuid: params.claudeUuid,
+            text: params.text,
+        });
+        if (!point) {
+            return { ok: false, error: 'That message was not found in the Claude conversation.' };
+        }
+
+        let files: RewindFilesResult | null = null;
+        if (params.undoFiles) {
+            if (liveQuery) {
+                try {
+                    files = await liveQuery.rewindFiles(point.userMessageUuid);
+                } catch (error) {
+                    files = { canRewind: false, error: error instanceof Error ? error.message : String(error) };
+                }
+            } else {
+                files = { canRewind: false, error: 'Claude has not run in this session since it started, so there are no file snapshots to restore.' };
+            }
+        }
+
+        if (point.resumeAt) {
+            session.resumeAt = point.resumeAt;
+        } else {
+            session.clearSessionId();
+        }
+        rewinding = true;
+        await abort();
+        session.client.updateMetadata((metadata) => ({
+            ...metadata,
+            rewinds: [...(metadata.rewinds ?? []), { fromAt: params.fromAt, toAt: Date.now() }],
+        }));
+        return { ok: true, files };
+    }
+
     // When to abort
     session.client.rpcHandlerManager.registerHandler('abort', doAbort); // When abort clicked
     session.client.rpcHandlerManager.registerHandler('switch', doSwitch); // When switch clicked
+    session.client.rpcHandlerManager.registerHandler('rewind', doRewind); // "Rewind to here" on a message
     // Removed catch-all stdin handler - now handled by RemoteModeDisplay keyboard handlers
 
     // Create permission handler
@@ -412,9 +469,15 @@ export async function claudeRemoteLauncher(session: Session): Promise<'switch' |
                         }));
                     },
                     onQueryReady: (q) => {
+                        liveQuery = q;
                         permissionHandler.setPermissionModeUpdater(async (mode) => {
                             await q.setPermissionMode(mode);
                         });
+                    },
+                    takeResumeAt: () => {
+                        const resumeAt = session.resumeAt;
+                        session.resumeAt = null;
+                        return resumeAt;
                     },
                     onThinkingChange: session.onThinkingChange,
                     claudeEnvVars: session.claudeEnvVars,
@@ -452,7 +515,7 @@ export async function claudeRemoteLauncher(session: Session): Promise<'switch' |
                 // Consume one-time Claude flags after spawn
                 session.consumeOneTimeFlags();
                 
-                if (!exitReason && abortController.signal.aborted) {
+                if (!exitReason && abortController.signal.aborted && !rewinding) {
                     session.client.closeClaudeSessionTurn('cancelled');
                     session.client.sendSessionEvent({ type: 'message', message: 'Aborted by user' });
                 }
@@ -486,6 +549,8 @@ export async function claudeRemoteLauncher(session: Session): Promise<'switch' |
                 logger.debug('[remote]: message queue flushed');
 
                 // Reset abort controller and future
+                liveQuery = null;
+                rewinding = false;
                 abortController = null;
                 abortFuture?.resolve(undefined);
                 abortFuture = null;

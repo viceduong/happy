@@ -40,6 +40,10 @@ export interface QueryOptions {
     permissionMode?: 'auto' | 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan'
     continue?: boolean
     resume?: string
+    /** With `resume`: continue from this chain entry, dropping everything after it (see SDK `resumeSessionAt`). */
+    resumeSessionAt?: string
+    /** Snapshot files before Claude edits them, so `Query.rewindFiles()` can restore them. */
+    enableFileCheckpointing?: boolean
     model?: string
     fallbackModel?: string
     strictMcpConfig?: boolean

@@ -154,6 +154,8 @@ export const MetadataSchema = z.object({
     }).optional(),
     /** A name the user gave the session; shown instead of the agent's summary. */
     customTitle: z.string().optional(),
+    /** "Rewind to here": time spans whose messages are no longer part of the conversation (written by the CLI). */
+    rewinds: z.array(z.object({ fromAt: z.number(), toAt: z.number() })).optional(),
     /**
      * When the session last did something a person would call activity: the
      * newest visible user message, visible agent text, or user-facing question.

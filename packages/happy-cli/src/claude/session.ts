@@ -24,6 +24,8 @@ export class Session {
     readonly jsRuntime: JsRuntime;
 
     sessionId: string | null;
+    /** Set by a rewind: the next query resumes the conversation at this chain entry. */
+    resumeAt: string | null = null;
     mode: 'local' | 'remote' = 'local';
     thinking: boolean = false;
     

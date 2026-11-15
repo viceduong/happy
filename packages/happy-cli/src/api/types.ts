@@ -330,6 +330,12 @@ export type Metadata = {
   // Lifecycle state management
   lifecycleState?: 'running' | 'archiveRequested' | 'archived' | string,
   lifecycleStateSince?: number,
+  /**
+   * "Rewind to here": time ranges whose messages the app hides, because the
+   * conversation was rewound to before them. Server and CLI share the host's
+   * clock, so message times compare directly.
+   */
+  rewinds?: { fromAt: number, toAt: number }[],
   archivedBy?: string,
   archiveReason?: string,
   flavor?: string

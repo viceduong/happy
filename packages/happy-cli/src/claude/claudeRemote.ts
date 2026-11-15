@@ -11,6 +11,7 @@ import { getProjectPath } from "./utils/path";
 import { awaitFileExist } from "@/modules/watcher/awaitFileExist";
 import { systemPrompt } from "./utils/systemPrompt";
 import { PermissionResult } from "./sdk/types";
+import type { RewindFilesResult } from '@anthropic-ai/claude-agent-sdk';
 import type { JsRuntime } from "./runClaude";
 import { fromRateLimitEvent, windowsFromGetUsage, type UnboundRateLimit, type UsageLimitsPatch, type RateLimitEventInfo } from "./utils/usageLimits";
 import type { UsageLimitWindow } from "@/api/types";
@@ -28,8 +29,13 @@ export async function claudeRemote(opts: {
     allowedTools: string[],
     signal?: AbortSignal,
     canCallTool: (toolName: string, input: unknown, mode: EnhancedMode, options: CanCallToolOptions) => Promise<PermissionResult>,
+    /** Hands over (once) the chain entry a rewind wants the resumed session to continue from. */
+    takeResumeAt?: () => string | null,
     /** Called when the Query object is ready — allows permission handler to call setPermissionMode */
-    onQueryReady?: (query: { setPermissionMode: (mode: string) => Promise<void> }) => void,
+    onQueryReady?: (query: {
+        setPermissionMode: (mode: string) => Promise<void>,
+        rewindFiles: (userMessageId: string) => Promise<RewindFilesResult>,
+    }) => void,
     /** Path to temporary settings file with SessionStart hook (required for session tracking) */
     hookSettingsPath: string,
     /** JavaScript runtime to use for spawning Claude Code (default: 'node') */
@@ -129,6 +135,9 @@ export async function claudeRemote(opts: {
     const sdkOptions: QueryOptions = {
         cwd: opts.path,
         resume: startFrom ?? undefined,
+        resumeSessionAt: startFrom ? opts.takeResumeAt?.() ?? undefined : undefined,
+        // Always on, so a later rewind can also restore files Claude edited.
+        enableFileCheckpointing: true,
         mcpServers: opts.mcpServers,
         plugins: pluginsFromArgs(opts.claudeArgs, opts.path),
         permissionMode: mapToClaudeMode(initial.mode.permissionMode),
@@ -180,6 +189,7 @@ export async function claudeRemote(opts: {
     if (opts.onQueryReady) {
         opts.onQueryReady({
             setPermissionMode: (mode: string) => response.setPermissionMode(mode as any),
+            rewindFiles: (userMessageId: string) => response.rewindFiles(userMessageId),
         });
     }
 

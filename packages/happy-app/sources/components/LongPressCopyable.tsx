@@ -29,7 +29,6 @@ type AnchorRect = {
 
 const MENU_WIDTH = 210;
 const MENU_ITEM_HEIGHT = 44;
-const MENU_HEIGHT = MENU_ITEM_HEIGHT * 2;
 const MENU_GAP = 8;
 const SCREEN_MARGIN = 12;
 
@@ -42,6 +41,8 @@ export function LongPressCopyable(props: {
     children: React.ReactNode;
     style?: StyleProp<ViewStyle>;
     text: string;
+    /** Adds "Rewind to here" at the top of the menu (the user's own messages). */
+    onRewind?: () => void;
 }) {
     const containerRef = React.useRef<View>(null);
     const [anchor, setAnchor] = React.useState<AnchorRect | null>(null);
@@ -80,14 +81,15 @@ export function LongPressCopyable(props: {
             {/* Mounted only while open. Rendering it unconditionally would
                 subscribe every message in the list to window-size and theme
                 changes through CopyMenu's hooks. */}
-            {anchor ? <CopyMenu anchor={anchor} onClose={closeMenu} text={props.text} /> : null}
+            {anchor ? <CopyMenu anchor={anchor} onClose={closeMenu} onRewind={props.onRewind} text={props.text} /> : null}
         </>
     );
 }
 
-function CopyMenu({ anchor, onClose, text }: {
+function CopyMenu({ anchor, onClose, onRewind, text }: {
     anchor: AnchorRect;
     onClose: () => void;
+    onRewind?: () => void;
     text: string;
 }) {
     const { theme } = useUnistyles();
@@ -113,12 +115,19 @@ function CopyMenu({ anchor, onClose, text }: {
         }
     }, [onClose, router, text]);
 
+    const handleRewind = React.useCallback(() => {
+        onClose();
+        onRewind?.();
+    }, [onClose, onRewind]);
+
+    const menuHeight = MENU_ITEM_HEIGHT * (onRewind ? 3 : 2);
+
     // Prefer sitting above the message; drop below when the message is close to
     // the top of the screen.
-    const above = anchor.y - MENU_HEIGHT - MENU_GAP;
+    const above = anchor.y - menuHeight - MENU_GAP;
     const top = above >= SCREEN_MARGIN
         ? above
-        : Math.min(anchor.y + anchor.height + MENU_GAP, windowHeight - MENU_HEIGHT - SCREEN_MARGIN);
+        : Math.min(anchor.y + anchor.height + MENU_GAP, windowHeight - menuHeight - SCREEN_MARGIN);
     // User messages hug the right edge, so align the menu's right edge to theirs.
     const left = Math.max(
         SCREEN_MARGIN,
@@ -135,6 +144,17 @@ function CopyMenu({ anchor, onClose, text }: {
             <View style={styles.container}>
                 <Pressable onPress={onClose} style={styles.backdrop} />
                 <AnimatedPopup style={[styles.menu, { left, top }]}>
+                    {onRewind ? (
+                        <Pressable
+                            accessibilityLabel={t('session.rewindToHere')}
+                            accessibilityRole="button"
+                            onPress={handleRewind}
+                            style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
+                        >
+                            <Ionicons color={theme.colors.text} name="arrow-undo-outline" size={17} />
+                            <Text style={styles.menuItemLabel}>{t('session.rewindToHere')}</Text>
+                        </Pressable>
+                    ) : null}
                     <Pressable
                         accessibilityLabel={t('common.copy')}
                         accessibilityRole="button"

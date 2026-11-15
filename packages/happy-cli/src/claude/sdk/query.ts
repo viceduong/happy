@@ -31,6 +31,8 @@ export function query(params: { prompt: QueryPrompt; options?: QueryOptions }): 
     const sdkOptions: Options = {
         cwd: opts?.cwd,
         resume: opts?.resume,
+        resumeSessionAt: opts?.resumeSessionAt,
+        enableFileCheckpointing: opts?.enableFileCheckpointing,
         continue: opts?.continue,
         model: opts?.model,
         fallbackModel: opts?.fallbackModel,

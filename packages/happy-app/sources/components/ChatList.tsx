@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { hideRewoundMessages } from '@/utils/rewoundMessages';
 import { useSession, useSessionMessages, useSetting } from "@/sync/storage";
 import { sync } from '@/sync/sync';
 import { ActivityIndicator, AppState, NativeScrollEvent, NativeSyntheticEvent, Platform, Pressable, View } from 'react-native';
@@ -180,7 +181,9 @@ export const ChatList = React.memo((props: {
     onHeaderBackdropVisibilityChange?: (visible: boolean) => void;
     onBottomDockVisibilityChange?: (visible: boolean) => void;
 }) => {
-    const { messages, hasMoreOlder, isLoadingOlder } = useSessionMessages(props.session.id);
+    const { messages: allMessages, hasMoreOlder, isLoadingOlder } = useSessionMessages(props.session.id);
+    const rewinds = props.session.metadata?.rewinds;
+    const messages = React.useMemo(() => hideRewoundMessages(allMessages, rewinds), [allMessages, rewinds]);
     return (
         <ChatListInternal
             metadata={props.session.metadata}

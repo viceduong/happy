@@ -1,4 +1,5 @@
 import { AgentContentView } from '@/components/AgentContentView';
+import { subscribeComposerText } from '@/sync/composerPrefill';
 import { MobileGlassBackdrop } from '@/components/MobileGlass';
 import { AgentGoalBar, type AgentGoalAction } from '@/components/AgentGoalBar';
 import { AgentQuestionBanner } from '@/components/AgentQuestionBanner';
@@ -695,6 +696,15 @@ const ChatComposer = React.memo(function ChatComposer(props: ChatComposerProps) 
     }, []);
 
     const { clearDraft } = useDraft(sessionId, message, applyDraft);
+
+    // "Rewind to here" hands the rewound message back to be edited and resent.
+    React.useEffect(() => {
+        if (!sessionId) return;
+        return subscribeComposerText(sessionId, (text) => {
+            applyDraft(text);
+            claimComposerFocus(inputHandleRef, { caretToEnd: true });
+        });
+    }, [applyDraft, sessionId]);
 
     const handleChangeText = React.useCallback((text: string) => {
         // Transition keeps the textarea responsive even when the draft

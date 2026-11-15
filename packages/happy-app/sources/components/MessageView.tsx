@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useRewindToMessage } from '@/hooks/useRewindToMessage';
 import { Platform, Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { Ionicons } from '@expo/vector-icons';
@@ -177,6 +178,7 @@ function UserTextBlock(props: {
     sync.sendMessage(props.sessionId, option.title, { source: 'option' });
   }, [props.sessionId]);
 
+  const startRewind = useRewindToMessage(props.sessionId);
   const userMessageBubbleColor = useSetting('userMessageBubbleColor');
   const { theme } = useUnistyles();
   const bubblePalette = resolveUserMessageBubbleColor(userMessageBubbleColor, theme.dark);
@@ -247,8 +249,15 @@ function UserTextBlock(props: {
   return (
     <UserMessageFrame pending={props.message.pending} queuedWhileBusy={props.message.meta?.queuedWhileBusy} createdAt={props.message.createdAt} sendError={props.message.sendError} author={props.message.author}>
       {/* Long-press copies the whole message through our own menu rather than the
-          OS selection callout. Rewind remains in session actions. */}
-      <LongPressCopyable style={copyTargetStyle} text={parsed.text}>
+          OS selection callout, and offers "Rewind to here" for the user's own,
+          already-sent messages. */}
+      <LongPressCopyable
+        style={copyTargetStyle}
+        text={parsed.text}
+        onRewind={startRewind && !props.message.pending && !isOtherParticipantMessage(props.message)
+          ? () => startRewind(props.message, parsed.text)
+          : undefined}
+      >
         <View style={[styles.userMessageBubble, styles.userMessageBubbleSolid, bubbleStyle]}>
           <MarkdownView externalCopyHandler markdown={parsed.text} onOptionPress={handleOptionPress} sessionId={props.sessionId} />
         </View>

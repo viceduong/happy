@@ -230,7 +230,7 @@ export async function runCodex(opts: {
     // On reconnect, un-archive the session and skip replaying old messages.
     if (reconnectSessionId) {
         session.suppressNextArchiveSignal();
-        session.skipExistingMessages();
+        session.skipExistingMessages(parseInt(process.env.HAPPY_RECONNECT_SEQ || '0', 10));
         session.updateMetadata((meta) => ({
             ...meta,
             lifecycleState: 'running',

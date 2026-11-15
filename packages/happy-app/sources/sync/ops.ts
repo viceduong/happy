@@ -943,6 +943,34 @@ export async function sessionAbort(sessionId: string): Promise<void> {
     });
 }
 
+export type SessionRewindResult = {
+    ok: boolean;
+    error?: string;
+    /** Present when code undo was asked for: what the SDK could restore. */
+    files?: { canRewind: boolean; error?: string; filesChanged?: string[] } | null;
+};
+
+/**
+ * "Rewind to here": asks the session's CLI to drop a user message and
+ * everything after it from the Claude conversation, optionally restoring the
+ * files Claude edited since then. The CLI hides the dropped messages by
+ * recording the span in metadata. A session with no CLI attached cannot answer
+ * the RPC; that comes back as a result without an error text.
+ */
+export async function sessionRewind(sessionId: string, params: {
+    claudeUuid?: string;
+    text: string;
+    fromAt: number;
+    undoFiles: boolean;
+}): Promise<SessionRewindResult> {
+    try {
+        return await apiSocket.sessionRPC<SessionRewindResult, typeof params>(sessionId, 'rewind', params);
+    } catch (error) {
+        console.error(`Rewind failed for session ${sessionId}`, error);
+        return { ok: false };
+    }
+}
+
 /**
  * Puts a picture already uploaded to the session's attachment store onto the
  * bot behind a Happy Agent session. The agent downloads it by ref the way it
