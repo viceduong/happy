@@ -159,7 +159,8 @@ export interface SessionRowData {
     activeAt?: number;
     createdAt: number;
     // Last meaningful message, falling back to this device's sent-message
-    // record and then creation — see getSessionActivityAt. Grouping the list by
+    // record, a stopped session's last activity and then creation — see
+    // getSessionActivityAt. Grouping the list by
     // project loses the global ordering the sessions were sorted into, so the
     // flat list re-sorts on these two keys instead.
     lastActivityAt: number;

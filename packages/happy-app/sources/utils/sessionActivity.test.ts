@@ -38,6 +38,28 @@ describe('getSessionActivityAt', () => {
         expect(value).toBe(300);
     });
 
+    it("falls back to the server's last activity of a stopped session when it is newer than this device's send", () => {
+        const value = getSessionActivityAt(session({
+            metadata: { path: '/repo', host: 'host' },
+            lastMessageSentAt: 300,
+            active: false,
+            activeAt: 700,
+        }));
+        expect(value).toBe(700);
+    });
+
+    // activeAt moves on every heartbeat while the process is up; reading it
+    // for a live session would re-sort the list continuously.
+    it('ignores the heartbeat of a running session', () => {
+        const value = getSessionActivityAt(session({
+            metadata: { path: '/repo', host: 'host' },
+            lastMessageSentAt: 300,
+            active: true,
+            activeAt: 700,
+        }));
+        expect(value).toBe(300);
+    });
+
     it('falls back to creation when the session has never been touched', () => {
         expect(getSessionActivityAt(session())).toBe(100);
     });
