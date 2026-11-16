@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fromRateLimitEvent, mergeUsageLimits, synthesizeStatus, windowsFromGetUsage } from './usageLimits';
+import { fromRateLimitEvent, mergeUsageLimits, synthesizeStatus, windowsFromGetUsage, windowsFromRateLimitEvent } from './usageLimits';
 
 describe('windowsFromGetUsage', () => {
     it('normalizes ISO resets_at to epoch ms and keeps 0-100 utilization as-is', () => {
@@ -183,5 +183,35 @@ describe('mergeUsageLimits review fixes', () => {
         });
         expect(second.windows.filter(w => w.id === 'plan')).toHaveLength(1);
         expect(second.windows[0].status).toBe('allowed_warning');
+    });
+});
+
+describe('windowsFromRateLimitEvent', () => {
+    // Shape of a current Claude Code event: the top level names the binding
+    // window but carries no utilization; every window's figure is nested.
+    const event = {
+        status: 'allowed' as const,
+        resetsAt: 1794862200,
+        rateLimitType: 'five_hour',
+        unifiedWindows: {
+            five_hour: { utilization: 0.02, resetsAt: 1794862200 },
+            seven_day: { utilization: 0.42, resetsAt: 1795194000 },
+        },
+    };
+
+    it('reads every window from unifiedWindows', () => {
+        expect(windowsFromRateLimitEvent(event)).toEqual([
+            { id: 'five_hour', status: 'allowed', utilization: 2, resetsAt: 1794862200_000 },
+            { id: 'seven_day', status: 'allowed', utilization: 42, resetsAt: 1795194000_000 },
+        ]);
+    });
+
+    it('derives the status of windows the event is not about', () => {
+        const windows = windowsFromRateLimitEvent({ ...event, unifiedWindows: { ...event.unifiedWindows, seven_day: { utilization: 0.95, resetsAt: 1795194000 } } });
+        expect(windows.find((w) => w.id === 'seven_day')?.status).toBe('allowed_warning');
+    });
+
+    it('returns nothing for older events without unifiedWindows', () => {
+        expect(windowsFromRateLimitEvent({ status: 'allowed', rateLimitType: 'five_hour', utilization: 0.5 })).toEqual([]);
     });
 });

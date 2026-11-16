@@ -13,7 +13,7 @@ import { systemPrompt } from "./utils/systemPrompt";
 import { PermissionResult } from "./sdk/types";
 import type { RewindFilesResult } from '@anthropic-ai/claude-agent-sdk';
 import type { JsRuntime } from "./runClaude";
-import { fromRateLimitEvent, windowsFromGetUsage, type UnboundRateLimit, type UsageLimitsPatch, type RateLimitEventInfo } from "./utils/usageLimits";
+import { fromRateLimitEvent, windowsFromRateLimitEvent, windowsFromGetUsage, type UnboundRateLimit, type UsageLimitsPatch, type RateLimitEventInfo } from "./utils/usageLimits";
 import type { UsageLimitWindow } from "@/api/types";
 import { pluginsFromArgs } from './utils/pluginsFromArgs';
 import { claudeProviderAuthMessage } from './utils/providerAuth';
@@ -334,8 +334,11 @@ export async function claudeRemote(opts: {
             if (message.type === 'rate_limit_event') {
                 const info = (message as { rate_limit_info?: RateLimitEventInfo }).rate_limit_info;
                 if (info) {
+                    const unified = windowsFromRateLimitEvent(info);
                     const normalized = fromRateLimitEvent(info);
-                    if (normalized.window) {
+                    if (unified.length > 0) {
+                        for (const window of unified) pendingUsageWindows.set(window.id, window);
+                    } else if (normalized.window) {
                         pendingUsageWindows.set(normalized.window.id, normalized.window);
                     } else if (normalized.unbound) {
                         pendingUnbound = normalized.unbound;

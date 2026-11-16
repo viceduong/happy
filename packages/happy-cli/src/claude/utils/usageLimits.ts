@@ -2,10 +2,10 @@
  * Normalizes plan rate-limit data from the two Claude SDK sources into the
  * backend-neutral UsageLimits shape carried in session agent state:
  *
- * - `rate_limit_event` (push): one window per event — whichever limit
- *   currently binds. `rateLimitType` may be absent, utilization is a 0-1
- *   fraction, `resetsAt` is unix seconds (derived from the
- *   anthropic-ratelimit-unified-reset header).
+ * - `rate_limit_event` (push): the limit that currently binds (`rateLimitType`
+ *   may be absent), plus — in current Claude Code — `unifiedWindows` with the
+ *   utilization of every window. Utilization is a 0-1 fraction, `resetsAt` is
+ *   unix seconds (derived from the anthropic-ratelimit-unified-reset header).
  * - `get_usage` (pull): all windows at once. Utilization is 0-100,
  *   `resets_at` is an ISO 8601 string, and windows carry no status.
  */
@@ -88,6 +88,31 @@ export type RateLimitEventInfo = {
     rateLimitType?: string,
     utilization?: number,
     resetsAt?: number,
+    /** Every window's current utilization; the top-level fields then carry none. */
+    unifiedWindows?: Record<string, { utilization?: number, resetsAt?: number } | null | undefined>,
+}
+
+/**
+ * The per-window figures of an event's `unifiedWindows`. Without them an
+ * "allowed" event carries no utilization at all, and the percentage shown
+ * stayed at whatever the session's first get_usage seed said for as long as
+ * the process lived. The window the event is about keeps the event's status;
+ * the others get one derived from their utilization.
+ */
+export function windowsFromRateLimitEvent(info: RateLimitEventInfo): UsageLimitWindow[] {
+    if (!info.unifiedWindows) return [];
+    const windows: UsageLimitWindow[] = [];
+    for (const [id, value] of Object.entries(info.unifiedWindows)) {
+        if (!value) continue;
+        const utilization = normalizeEventUtilization(value.utilization) ?? null;
+        windows.push({
+            id,
+            utilization,
+            resetsAt: normalizeEventResetsAt(value.resetsAt) ?? null,
+            status: id === info.rateLimitType ? info.status : synthesizeStatus(utilization),
+        });
+    }
+    return windows;
 }
 
 export function fromRateLimitEvent(info: RateLimitEventInfo): { window?: UsageLimitWindow, unbound?: UnboundRateLimit } {
