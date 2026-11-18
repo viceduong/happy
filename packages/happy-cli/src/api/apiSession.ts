@@ -219,11 +219,14 @@ export class ApiSessionClient extends EventEmitter {
     private closed = false;
     private ignoreArchiveSignal = false;
     /**
-     * On reconnect: messages up to this seq were seen by the previous process
-     * and are skipped rather than routed. Anything newer is a message sent
-     * while the session was resuming and must still reach Claude.
+     * On reconnect: messages created before the resume began were the
+     * previous process's to answer and are skipped rather than routed.
+     * Anything newer was sent while the session was resuming and must still
+     * reach the agent. A time, not a seq: the seq a resume is handed comes
+     * from the app's copy of the session, which can be far behind the
+     * server, and everything after it would be answered a second time.
      */
-    private skipMessagesThroughSeq: number | null = null;
+    private skipMessagesCreatedBefore: number | null = null;
     private claudeSessionProtocolState: ClaudeSessionProtocolState = {
         currentTurnId: null,
         uuidToProviderSubagent: new Map<string, string>(),
@@ -611,10 +614,10 @@ export class ApiSessionClient extends EventEmitter {
         // advance the cursor past them. The cutoff is fixed when the session is
         // resumed, so a message sent while this fetch pages through a long
         // history is routed instead of being swallowed with the old ones.
-        const skipThroughSeq = this.skipMessagesThroughSeq;
-        if (skipThroughSeq !== null) {
-            this.skipMessagesThroughSeq = null;
-            logger.debug(`[API] Reconnect mode: skipping messages through seq ${skipThroughSeq}`);
+        const skipBefore = this.skipMessagesCreatedBefore;
+        if (skipBefore !== null) {
+            this.skipMessagesCreatedBefore = null;
+            logger.debug(`[API] Reconnect mode: skipping messages created before ${new Date(skipBefore).toISOString()}`);
         }
 
         let afterSeq = this.lastReceivedSeq;
@@ -639,7 +642,7 @@ export class ApiSessionClient extends EventEmitter {
                     maxSeq = message.seq;
                 }
 
-                if (skipThroughSeq !== null && message.seq <= skipThroughSeq) continue;
+                if (skipBefore !== null && message.createdAt < skipBefore) continue;
 
                 if (message.content?.t !== 'encrypted') {
                     continue;
@@ -948,9 +951,9 @@ export class ApiSessionClient extends EventEmitter {
         this.ignoreArchiveSignal = true;
     }
 
-    /** Skip routing messages with seq <= throughSeq (the session's seq when it was resumed). */
-    skipExistingMessages(throughSeq: number) {
-        this.skipMessagesThroughSeq = throughSeq;
+    /** Skip routing messages created before `createdBefore` (when the resume began). */
+    skipExistingMessages(createdBefore: number) {
+        this.skipMessagesCreatedBefore = createdBefore;
     }
 
     updateMetadata(handler: (metadata: Metadata) => Metadata) {

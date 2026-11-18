@@ -857,6 +857,7 @@ export async function startDaemon(): Promise<void> {
             HAPPY_RECONNECT_SEQ: String(encryption.seq),
             HAPPY_RECONNECT_METADATA_VERSION: String(encryption.metadataVersion),
             HAPPY_RECONNECT_AGENT_STATE_VERSION: String(encryption.agentStateVersion),
+            HAPPY_RECONNECT_AT: String(Date.now()),
           }),
         });
       } catch (error) {

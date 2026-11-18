@@ -1,3 +1,4 @@
+import { reconnectStartedAt } from '@/utils/reconnectStartedAt';
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
 
@@ -286,7 +287,7 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
     // On reconnect, un-archive the session and skip replaying old messages.
     if (reconnectSessionId) {
         session.suppressNextArchiveSignal();
-        session.skipExistingMessages(response.seq);
+        session.skipExistingMessages(reconnectStartedAt());
         session.updateMetadata((meta) => ({
             ...meta,
             lifecycleState: 'running',

@@ -1,3 +1,4 @@
+import { reconnectStartedAt } from '@/utils/reconnectStartedAt';
 import { render } from "ink";
 import React from "react";
 import { ApiClient } from '@/api/api';
@@ -230,7 +231,7 @@ export async function runCodex(opts: {
     // On reconnect, un-archive the session and skip replaying old messages.
     if (reconnectSessionId) {
         session.suppressNextArchiveSignal();
-        session.skipExistingMessages(parseInt(process.env.HAPPY_RECONNECT_SEQ || '0', 10));
+        session.skipExistingMessages(reconnectStartedAt());
         session.updateMetadata((meta) => ({
             ...meta,
             lifecycleState: 'running',
